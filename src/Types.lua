@@ -7,7 +7,7 @@ type Listener = (ClientReplica, Indice, (Indice, any, any) -> ()) -> (RBXScriptC
 type ReplicateTo = { Player } | Player | "All"
 
 export type Indice = { string | number } | string
-export type unknown = any
+
 export type Signal = {
 	Connect: RBXScriptConnection,
 }
@@ -26,6 +26,7 @@ export type ClientReplica = {
 	AddCleanupTask: (ClientReplica, () -> nil) -> (),
 	Update: (ClientReplica, Indice, any, any) -> (),
 	Changed: Signal,
+	Destroying: Signal,
 	Cleaner: Cleaner,
 
 	ListenToWrite: Listener,
@@ -58,7 +59,8 @@ export type ServerReplica = {
 	WriteLib: ServerWriteLib?,
 	ServerEvents: {(...any) -> ()},
 
-	Changed: any,
+	Changed: Signal,
+	Destroying: Signal,
 
 	ConnectOnServerEvent: (ServerReplica, (...any) -> ()) -> (() -> ()),
 	AddCleanupTask: (ServerReplica, () -> nil) -> (),
