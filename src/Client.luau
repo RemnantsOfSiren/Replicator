@@ -1,6 +1,7 @@
 local BridgeNet = require(script.Parent.Parent.BridgeNet) :: { any }
 local LemonSignal = require(script.Parent.Parent.Signal) :: { any }
 local Trove = require(script.Parent.Parent.Trove) :: { any }
+local Types = require(script.Parent.Types) :: { any }
 
 local Util = require(script.Parent.Table) :: { any }
 
@@ -303,7 +304,7 @@ local ReplicaClient = {
 	Replica = Replica,
 }
 
-function ReplicaClient.ListenToNewReplica(Name: string, Callback: (unknown) -> ())
+function ReplicaClient.ListenToNewReplica(Name: string, Callback: (Types.ClientReplica) -> ())
 	local Replicator = Replicators[Name] or CreateReplicator(Name)
 	Replicator.Added:Connect(Callback)
 

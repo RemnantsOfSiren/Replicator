@@ -6,6 +6,7 @@ local Util = require(script.Parent.Table) :: { any }
 local BridgeNet = require(script.Parent.Parent.BridgeNet) :: { any }
 local LemonSignal = require(script.Parent.Parent.Signal) :: { any }
 local Trove = require(script.Parent.Parent.Trove) :: { any }
+local Types = require(script.Parent.Types) :: { any }
 
 export type ReplicaConfig = {
 	Name: string,
@@ -79,7 +80,7 @@ local ReplicaServer = {
 	Replica = Replica,
 }
 
-function ReplicaServer.NewReplica(Config: ReplicaConfig)
+function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 	local Id = HttpService:GenerateGUID(false)
 
 	local WriteFunctionFlag: boolean = false
