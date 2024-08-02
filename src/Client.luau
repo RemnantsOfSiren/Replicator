@@ -202,6 +202,7 @@ local function CreateReplicator(Name)
 			Replicator.Replicas[Id] = nil
 			Replica.Destroying:Fire()
 			task.delay(1, Replica.Destroying.Destroy, Replica.Destroying)
+			Replica.Cleaner:Destroy()
 			Replica.Changed:Destroy()
 			table.clear(Replica)
 		end
