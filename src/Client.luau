@@ -307,11 +307,11 @@ local ReplicaClient = {
 
 function ReplicaClient.ListenToNewReplica(Name: string, Callback: (Types.ClientReplica) -> ())
 	local Replicator = Replicators[Name] or CreateReplicator(Name)
-	Replicator.Added:Connect(Callback)
-
 	for _, _Replica in pairs(Replicator.Replicas) do
 		task.spawn(Callback, _Replica)
 	end
+
+	return 	Replicator.Added:Connect(Callback)
 end
 
 return ReplicaClient
