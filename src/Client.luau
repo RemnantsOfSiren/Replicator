@@ -52,11 +52,20 @@ local function CreateReplicator(Name)
 			Id = Id,
 			Tags = Tags,
 			Data = Data,
+			ClientEvents = {},
 			Cleaner = Trove.new(),
 			_Callbacks = {},
 			_WriteCallbacks = {},
 			_OldData = Util.CopyTable(Data, true),
 		}
+
+		function Replica:ConnectOnClientEvent(Callback: (...any) -> ())
+			table.insert(Replica.ClientEvents, Callback)
+
+			return function()
+				table.remove(Replica.ClientEvents, table.find(Replica.ClientEvents, Callback))
+			end
+		end
 
 		function Replica:Write(FunctionName: string, ...)
 			if not Replica.WriteLib then
@@ -207,6 +216,23 @@ local function CreateReplicator(Name)
 			table.clear(Replica)
 		end
 
+		Replica.Cleaner:Add(
+			MainBridge:Connect(function(Args)
+				local Event = Args[1]
+
+				if Event ~= "FireClient" then
+					return
+				end
+
+				if Args[2] == Replica.Name and Args[3] == Id then
+					for _, Callback in Replica.ServerEvents do
+						task.spawn(Callback, table.unpack(Args, 4))
+					end
+				end
+			end),
+			"Disconnect"
+		)
+
 		Replicator.Replicas[Id] = Replica
 		Replicator.Added:Fire(Replica)
 	end
@@ -311,7 +337,7 @@ function ReplicaClient.ListenToNewReplica(Name: string, Callback: (Types.ClientR
 		task.spawn(Callback, _Replica)
 	end
 
-	return 	Replicator.Added:Connect(Callback)
+	return Replicator.Added:Connect(Callback)
 end
 
 return ReplicaClient

@@ -4,7 +4,7 @@ local Types = {}
 local Trove = require(script.Parent.Parent.Trove) :: { any }
 
 type Listener = (ClientReplica, Indice, (Indice, any, any) -> ()) -> (RBXScriptConnection)
-type ReplicateTo = { Player } | Player | "All"
+export type ReplicateTo = { Player } | Player | "All"
 
 export type Indice = { string | number } | string
 
@@ -23,6 +23,7 @@ export type ClientReplica = {
 	Tags: {any},
 	Data: {any},
 
+	ConnectOnClientEvent: (ClientReplica, (...any) -> ()) -> (() -> ()),
 	AddCleanupTask: (ClientReplica, () -> nil) -> (),
 	Update: (ClientReplica, Indice, any, any) -> (),
 	Changed: Signal,
@@ -70,6 +71,8 @@ export type ServerReplica = {
 	ListenToNewKey: Listener,
 	ListenToKeyRemoved: Listener,
 	Cleaner: Cleaner,
+	FireClient: (player: Player, ...any) -> (),
+	FireAllClients: (...any) -> (),
 	Destroy: (ServerReplica) -> ()
 }
 
