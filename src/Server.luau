@@ -95,6 +95,7 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 		ServerEvents = {},
 		Changed = LemonSignal.new(),
 		Destroying = LemonSignal.new(),
+		Id = Id,
 	}
 
 	Replica.WriteLib = Replica.WriteLibModule and LoadWriteLib(Replica.WriteLibModule)
@@ -256,8 +257,8 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
         FireBridge({ "FireClient", Config.Name, Id, ... })
 	end
 
-	function Replica:AddCleanupTask(Task: () -> nil)
-		Replica.Cleaner:Add(Task, true)
+	function Replica:AddCleanupTask(Task: () -> nil, OptionalCleanupMethod: any?)
+		Replica.Cleaner:Add(Task, OptionalCleanupMethod or true)
 	end
 
 	function Replica:Write(WriteFunction: string, ...)
