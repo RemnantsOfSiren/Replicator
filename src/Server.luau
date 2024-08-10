@@ -253,6 +253,10 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 		return
 	end
 
+	function Replica:FireClient(...)
+        FireBridge({ "FireClient", Config.Name, Id, ... })
+	end
+
 	function Replica:AddCleanupTask(Task: () -> nil, OptionalCleanupMethod: any?)
 		Replica.Cleaner:Add(Task, OptionalCleanupMethod or true)
 	end
