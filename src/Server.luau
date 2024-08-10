@@ -95,6 +95,7 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 		ServerEvents = {},
 		Changed = LemonSignal.new(),
 		Destroying = LemonSignal.new(),
+		Id = Id,
 	}
 
 	Replica.WriteLib = Replica.WriteLibModule and LoadWriteLib(Replica.WriteLibModule)
