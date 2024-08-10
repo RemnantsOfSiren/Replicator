@@ -253,8 +253,8 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 		return
 	end
 
-	function Replica:AddCleanupTask(Task: () -> nil)
-		Replica.Cleaner:Add(Task, true)
+	function Replica:AddCleanupTask(Task: () -> nil, OptionalCleanupMethod: any?)
+		Replica.Cleaner:Add(Task, OptionalCleanupMethod or true)
 	end
 
 	function Replica:Write(WriteFunction: string, ...)
