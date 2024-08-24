@@ -216,23 +216,6 @@ local function CreateReplicator(Name)
 			table.clear(Replica)
 		end
 
-		Replica.Cleaner:Add(
-			MainBridge:Connect(function(Args)
-				local Event = Args[1]
-
-				if Event ~= "FireClient" then
-					return
-				end
-
-				if Args[2] == Replica.Name and Args[3] == Id then
-					for _, Callback in Replica.ServerEvents do
-						task.spawn(Callback, table.unpack(Args, 4))
-					end
-				end
-			end),
-			"Disconnect"
-		)
-
 		Replicator.Replicas[Id] = Replica
 		Replicator.Added:Fire(Replica)
 	end
@@ -241,7 +224,18 @@ local function CreateReplicator(Name)
 end
 
 MainBridge:Connect(function(Args)
-	if Args[1] == "Create" then
+	if Args[1] == "FireClient" then
+		local Name, Id = Args[2], Args[3]
+		local Replicator = Replicators[Name]
+		if Replicator then
+			local _Replica = Replicator.Replicas[Id]
+			if _Replica then
+				for _, Callback in _Replica.ClientEvents do
+					task.spawn(Callback, unpack(Args, 4))
+				end
+			end
+		end
+	elseif Args[1] == "Create" then
 		local _, Name, Id, Tags, Data, WriteLib = unpack(Args)
 		local Replicator = Replicators[Name] or CreateReplicator(Name)
 		task.spawn(Replicator.AddNewReplica, Id, Tags, Data, WriteLib)

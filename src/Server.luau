@@ -55,11 +55,11 @@ local MainBridge = BridgeNet.ServerBridge("ReplicaServer")
 MainBridge.OnServerInvoke = function(Player)
 	local _Replicas = {}
 
-	for Id, Replica in pairs(Replicas) do
+	for Id, _Replica in pairs(Replicas) do
 		if
-			(typeof(Replica.To) == "string" and Replica.To:lower() == "all")
-			or (typeof(Replica.To) == "userdata" and Replica.To == Player)
-			or (typeof(Replica.To) == "table" and table.find(Replica.To, Player))
+			(typeof(_Replica.To) == "string" and _Replica.To:lower() == "all")
+			or (typeof(_Replica.To) == "table" and table.find(_Replica.To, Player))
+			or (_Replica.To == Player)
 		then
 			if not _Replicas[Replica.Name] then
 				_Replicas[Replica.Name] = {}
