@@ -152,8 +152,6 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 			end
 		end
 
-		print(Pointer)
-
 		local LastIndex = Indicies[#Indicies]
 		local Operator = if typeof(LastIndex) == "string" then LastIndex:match("[+%%-*/^]$") else nil
 
@@ -304,7 +302,6 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 			end
 			self.Changed:Fire({}, self.Data, OldData)
 		else
-			print(_Indicies)
 			Update(_Indicies, if typeof(Value) == "table" then Util.CopyTable(Value, true) else Value)
 		end
 
