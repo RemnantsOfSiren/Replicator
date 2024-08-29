@@ -3,10 +3,10 @@ local Types = {}
 
 local Trove = require(script.Parent.Parent.Trove) :: { any }
 
-type Listener = (ClientReplica, Indice, (Indice, any, any) -> ()) -> (RBXScriptConnection)
 export type ReplicateTo = { Player } | Player | "All"
 
-export type Indice = { string | number } | string
+export type Indices = { string | number } | string | number
+type Listener = (ClientReplica, Indices, (Indices, any, any) -> ()) -> (RBXScriptConnection)
 
 export type Signal = {
 	Connect: RBXScriptConnection,
@@ -25,7 +25,7 @@ export type ClientReplica = {
 
 	ConnectOnClientEvent: (ClientReplica, (...any) -> ()) -> (() -> ()),
 	AddCleanupTask: (ClientReplica, () -> nil) -> (),
-	Update: (ClientReplica, Indice, any, any) -> (),
+	Update: (self: ClientReplica, Indices, any, any) -> (),
 	Changed: Signal,
 	Destroying: Signal,
 	Cleaner: Cleaner,
@@ -63,17 +63,17 @@ export type ServerReplica = {
 	Changed: Signal,
 	Destroying: Signal,
 
-	ConnectOnServerEvent: (ServerReplica, (...any) -> ()) -> (() -> ()),
-	AddCleanupTask: (ServerReplica, () -> nil) -> (),
-	Write: (ServerReplica, string, ...any) -> (any),
-	Set: (ServerReplica, {unknown} | string, any) -> (),
+	ConnectOnServerEvent: (self: ServerReplica, Callback: (...any) -> ()) -> (() -> ()),
+	AddCleanupTask: (self: ServerReplica, CallbackOrObject: any, Method: string?) -> (),
+	Write: (self: ServerReplica, Method: string, ...any) -> (any),
+	Set: (self: ServerReplica, Indices: Indices, Value: any) -> (),
 	ListenToChange: Listener,
 	ListenToNewKey: Listener,
 	ListenToKeyRemoved: Listener,
 	Cleaner: Cleaner,
-	FireClient: (player: Player, ...any) -> (),
+	FireClient: (Player: Player, ...any) -> (),
 	FireAllClients: (...any) -> (),
-	Destroy: (ServerReplica) -> ()
+	Destroy: (self: ServerReplica) -> ()
 }
 
 return Types

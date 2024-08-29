@@ -1,9 +1,11 @@
+local Util = require(script.Parent.Table) :: { any }
+local Parser = require(script.Parent.Parser) :: ({ string | number } | string) -> { unknown }
+
 local BridgeNet = require(script.Parent.Parent.BridgeNet) :: { any }
 local LemonSignal = require(script.Parent.Parent.Signal) :: { any }
 local Trove = require(script.Parent.Parent.Trove) :: { any }
 local Types = require(script.Parent.Types) :: { any }
 
-local Util = require(script.Parent.Table) :: { any }
 
 local MainBridge = BridgeNet.ClientBridge("ReplicaServer")
 
@@ -135,14 +137,7 @@ local function CreateReplicator(Name)
 		end
 
 		function Replica:ListenToChange(Indicies: { string | number } | string, Callback)
-			local _Indicies: { unknown } = (
-				if typeof(Indicies) == "string"
-					then string.split(
-						Indicies,
-						(string.find(Indicies, ".") and ".") or (string.find(Indicies, "/") and "/")
-					)
-					else Indicies
-			) :: { unknown }
+			local _Indicies = Parser(Indicies)
 
 			return Replica.Changed:Connect(function(ChangedIndicies)
 				local Match = true
@@ -166,14 +161,7 @@ local function CreateReplicator(Name)
 		end
 
 		function Replica:ListenToNewKey(Indicies: { string | number } | string, Callback)
-			local _Indicies: { unknown } = (
-				if typeof(Indicies) == "string"
-					then string.split(
-						Indicies,
-						(string.find(Indicies, ".") and ".") or (string.find(Indicies, "/") and "/")
-					)
-					else Indicies
-			) :: { unknown }
+			local _Indicies = Parser(Indicies)
 
 			return Replica.Changed:Connect(function(ChangedIndices, Value, OldValue)
 				if not OldValue and ChangedIndices[#ChangedIndices - 1] == _Indicies[#_Indicies] then
@@ -183,14 +171,7 @@ local function CreateReplicator(Name)
 		end
 
 		function Replica:ListenToKeyRemoved(Indicies: { string | number } | string, Callback)
-			local _Indicies: { unknown } = (
-				if typeof(Indicies) == "string"
-					then string.split(
-						Indicies,
-						(string.find(Indicies, ".") and ".") or (string.find(Indicies, "/") and "/")
-					)
-					else Indicies
-			) :: { unknown }
+			local _Indicies = Parser(Indicies)
 
 			return Replica.Changed:Connect(function(ChangedIndices, Value, OldValue)
 				if not Value and ChangedIndices[#ChangedIndices - 1] == _Indicies[#_Indicies] then
@@ -316,7 +297,7 @@ task.spawn(function()
 		local Replicator = Replicators[Name] or CreateReplicator(Name)
 
 		for Id, Info in pairs(Replicas) do
-			task.spawn(Replicator.AddNewReplica, Id, Info.Tags, Info.Data)
+			task.spawn(Replicator.AddNewReplica, Id, Info.Tags, Info.Data, Info.WriteLib)
 		end
 	end
 end)

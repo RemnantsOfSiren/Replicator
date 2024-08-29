@@ -2,6 +2,7 @@ local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Util = require(script.Parent.Table) :: { any }
+local Parser = require(script.Parent.Parser) :: ({ string | number } | string) -> { unknown }
 
 local BridgeNet = require(script.Parent.Parent.BridgeNet) :: { any }
 local LemonSignal = require(script.Parent.Parent.Signal) :: { any }
@@ -15,8 +16,6 @@ export type ReplicaConfig = {
 	To: { Player } | Player | "All",
 	WriteLib: ModuleScript?,
 }
-
-local Replica = newproxy(false)
 
 local Replicas = {}
 local WriteLibCache = {}
@@ -55,11 +54,11 @@ local MainBridge = BridgeNet.ServerBridge("ReplicaServer")
 MainBridge.OnServerInvoke = function(Player)
 	local _Replicas = {}
 
-	for Id, _Replica in pairs(Replicas) do
+	for Id, Replica in pairs(Replicas) do
 		if
-			(typeof(_Replica.To) == "string" and _Replica.To:lower() == "all")
-			or (typeof(_Replica.To) == "table" and table.find(_Replica.To, Player))
-			or (_Replica.To == Player)
+			(typeof(Replica.To) == "string" and Replica.To:lower() == "all")
+			or (typeof(Replica.To) == "table" and table.find(Replica.To, Player))
+			or (Replica.To == Player)
 		then
 			if not _Replicas[Replica.Name] then
 				_Replicas[Replica.Name] = {}
@@ -76,9 +75,7 @@ MainBridge.OnServerInvoke = function(Player)
 	return _Replicas
 end
 
-local ReplicaServer = {
-	Replica = Replica,
-}
+local ReplicaServer = {}
 
 function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 	local Id = HttpService:GenerateGUID(false)
@@ -86,7 +83,6 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 	local WriteFunctionFlag: boolean = false
 
 	local Replica = {
-		__type = Replica,
 		WriteLibModule = Config.WriteLib,
 		Tags = Config.Tags or {},
 		To = Config.To,
@@ -111,20 +107,17 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 	end
 
 	function Replica:ConnectOnServerEvent(Callback: (...any) -> ())
-		table.insert(Replica.ServerEvents, Callback)
+		table.insert(self.ServerEvents, Callback)
 
 		return function()
-			table.remove(Replica.ServerEvents, table.find(Replica.ServerEvents, Callback))
+			table.remove(self.ServerEvents, table.find(self.ServerEvents, Callback))
 		end
 	end
 
-	local Args = { "Create", Config.Name, Id, Replica.Tags, Config.Data, Replica.WriteLibModule }
-
-	FireBridge(Args)
+	FireBridge({ "Create", Config.Name, Id, Replica.Tags, Config.Data, Replica.WriteLibModule })
 
 	Replica.Changed:Connect(function(Indices, Value, OldValue)
-		local _Args = { "Changed", Config.Name, Id, Indices, Value, OldValue }
-		FireBridge(_Args)
+		FireBridge({ "Changed", Config.Name, Id, Indices, Value, OldValue })
 	end)
 
 	Replica.Cleaner:Add(
@@ -147,7 +140,7 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 	Replica.Data = Config.Data
 	Replica._OldData = Util.CopyTable(Replica.Data, true)
 
-	local function Update(Indicies, Value)
+	local function Update(Indicies: { string | number }, Value: any)
 		Replica._OldData = Util.CopyTable(Replica.Data, true)
 		local Pointer = Replica.Data
 
@@ -159,6 +152,8 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 			end
 		end
 
+		print(Pointer)
+
 		local LastIndex = Indicies[#Indicies]
 		local Operator = if typeof(LastIndex) == "string" then LastIndex:match("[+%%-*/^]$") else nil
 
@@ -166,78 +161,83 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 			LastIndex = LastIndex:sub(1, LastIndex:find(Operator) - 1)
 			Indicies[#Indicies] = LastIndex
 
-			if typeof(Value) == "table" and not (Operator:find("+") or Operator:find("-")) then
+			if type(Value) == "table" and not (Operator:find("+") or Operator:find("-")) then
 				return warn("Invalid Operator for Table")
 			end
 
 			local CurrentValue = Pointer[LastIndex]
 
-			if Operator:find("+") then
-				if typeof(CurrentValue) == "table" then
-					Value = Util.JoinTables(CurrentValue, { Value })
+			if CurrentValue then
+				if Operator:find("+") then
+					if typeof(CurrentValue) == "table" then
+						Value = Util.JoinTables(CurrentValue, { Value })
 
-					local Keys = {}
+						local Keys = {}
 
-					for Key in Value do
-						if not CurrentValue[Key] then
-							table.insert(Keys, Key)
+						for Key in Value do
+							if not CurrentValue[Key] then
+								table.insert(Keys, Key)
+							end
 						end
-					end
 
-					for _, Key in Keys do
-						local _Indicies = table.clone(Indicies)
-						_Indicies[#_Indicies + 1] = Key
-						Replica.Changed:Fire(_Indicies, Value[Key], nil)
-						CurrentValue[Key] = Value[Key]
-					end
-
-					return
-				else
-					CurrentValue += Value
-				end
-			elseif Operator:find("-") then
-				if typeof(CurrentValue) == "table" then
-					local Keys = {}
-
-					for Key in CurrentValue do
-						if Util.Equals(CurrentValue[Key], Value) then
-							table.insert(Keys, Key)
+						for _, Key in Keys do
+							local _Indicies = table.clone(Indicies)
+							_Indicies[#_Indicies + 1] = Key
+							Replica.Changed:Fire(_Indicies, Value[Key], nil)
+							CurrentValue[Key] = Value[Key]
 						end
-					end
 
-					for _, Key in Keys do
-						local _Indicies = table.clone(Indicies)
-						_Indicies[#_Indicies + 1] = Key
-						if typeof(Key) == "number" then
-							table.remove(CurrentValue, Key)
+						return
+					else
+						CurrentValue += Value
+					end
+				elseif Operator:find("-") then
+					if type(CurrentValue) == "table" then
+						if type(Value) ~= "table" or typeof(Value) ~= "userdata" then
+							Replica.Changed:Fire(Indicies, nil, CurrentValue)
+							table.remove(CurrentValue, table.find(CurrentValue, Value))
 						else
-							CurrentValue[Key] = nil
+							local Keys = {}
+
+							for Key in CurrentValue do
+								if Util.Equals(CurrentValue[Key], Value) then
+									table.insert(Keys, Key)
+								end
+							end
+
+							for _, Key in Keys do
+								local _Indicies = table.clone(Indicies)
+								_Indicies[#_Indicies + 1] = Key
+								if typeof(Key) == "number" then
+									Replica.Changed:Fire(_Indicies, nil, CurrentValue[Key])
+									table.remove(CurrentValue, Key)
+								else
+									Replica.Changed:Fire(_Indicies, nil, CurrentValue[Key])
+									CurrentValue[Key] = nil
+								end
+							end
 						end
-						Replica.Changed:Fire(_Indicies, nil, CurrentValue[Key])
+
+						return
+					else
+						CurrentValue -= Value
 					end
-
-					return
-				else
-					CurrentValue -= Value
+				elseif Operator:find("*") then
+					CurrentValue *= Value
+				elseif Operator:find("/") then
+					CurrentValue /= Value
+				elseif Operator:find("^") then
+					CurrentValue ^= Value
+				elseif Operator:find("%") then
+					CurrentValue %= Value
 				end
-			elseif Operator:find("*") then
-				CurrentValue *= Value
-			elseif Operator:find("/") then
-				CurrentValue /= Value
-			elseif Operator:find("^") then
-				CurrentValue ^= Value
-			elseif Operator:find("%") then
-				CurrentValue %= Value
+				
+				Value = CurrentValue
 			end
-
-			Value = CurrentValue
 		end
 
-		if Pointer[LastIndex] then
-			local IndexType = Pointer[LastIndex] and "string" or "number"
-			LastIndex = IndexType == "string" and LastIndex or tonumber(LastIndex)
-		end
-
+		local IndexType = Pointer[LastIndex] and "string" or "number"
+		LastIndex = IndexType == "string" and LastIndex or tonumber(LastIndex)
 		local OldValue = Pointer[LastIndex]
 
 		if typeof(OldValue) == "table" and typeof(Value) == "table" and Util.Equals(OldValue, Value, true) then
@@ -258,11 +258,11 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 	end
 
 	function Replica:AddCleanupTask(Task: () -> nil, OptionalCleanupMethod: any?)
-		Replica.Cleaner:Add(Task, OptionalCleanupMethod or true)
+		self.Cleaner:Add(Task, OptionalCleanupMethod or true)
 	end
 
 	function Replica:Write(WriteFunction: string, ...)
-		if Replica.WriteLib then
+		if self.WriteLib then
 			if not Replica.WriteLib[WriteFunction] then
 				warn(`Write Function {WriteFunction} was not in WriteLib!`)
 				return
@@ -280,37 +280,31 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 
 			WriteFunctionFlag = false
 
-			local Args = { "Write", Replica.Name, Id, WriteFunction, ... }
-
-			FireBridge(Args)
+			FireBridge({ "Write", Replica.Name, Id, WriteFunction, ... })
 
 			return ReturnedValues
 		end
+		
+		return nil
 	end
 
-	function Replica:Set(Indicies: { unknown } | string, Value)
-		local _Indicies: { unknown } = (
-			if typeof(Indicies) == "string"
-				then string.split(
-					Indicies,
-					(string.find(Indicies, ".") and ".") or (string.find(Indicies, "/") and "/")
-				)
-				else Indicies
-		) :: { unknown }
+	function Replica:Set(Indicies: { string | number } | string, Value)
+		local _Indicies = Parser(Indicies)
 
 		if #_Indicies == 0 and typeof(Value) == "table" then
-			if Util.Equals(Replica.Data, Value, true) then
+			if Util.Equals(self.Data, Value, true) then
 				return
 			end
 
-			local OldData = Util.CopyTable(Replica.Data, true)
+			local OldData = Util.CopyTable(self.Data, true)
 			for Index, _Value in Value do
 				if not OldData[Index] or OldData[Index] ~= _Value then
-					Replica.Data[Index] = _Value
+					self.Data[Index] = _Value
 				end
 			end
-			Replica.Changed:Fire({}, Replica.Data, OldData)
+			self.Changed:Fire({}, self.Data, OldData)
 		else
+			print(_Indicies)
 			Update(_Indicies, if typeof(Value) == "table" then Util.CopyTable(Value, true) else Value)
 		end
 
@@ -318,19 +312,12 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 	end
 
 	function Replica:ListenToChange(Indicies: { string | number } | string, Callback)
-		local _Indicies: { unknown } = (
-			if typeof(Indicies) == "string"
-				then string.split(
-					Indicies,
-					(string.find(Indicies, ".") and ".") or (string.find(Indicies, "/") and "/")
-				)
-				else Indicies
-		) :: { unknown }
+		local _Indicies = Parser(Indicies)
 
-		return Replica.Changed:Connect(function(ChangedIndicies)
+		return self.Changed:Connect(function(ChangedIndicies)
 			local Match = true
-			local _Data = Replica.Data
-			local _OldData = Replica._OldData
+			local _Data = self.Data
+			local _OldData = self._OldData
 
 			for I, Index in pairs(_Indicies) do
 				_Data = _Data[Index]
@@ -349,16 +336,9 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 	end
 
 	function Replica:ListenToNewKey(Indicies: { string | number } | string, Callback)
-		local _Indicies: { unknown } = (
-			if typeof(Indicies) == "string"
-				then string.split(
-					Indicies,
-					(string.find(Indicies, ".") and ".") or (string.find(Indicies, "/") and "/")
-				)
-				else Indicies
-		) :: { unknown }
+		local _Indicies = Parser(Indicies)
 
-		return Replica.Changed:Connect(function(ChangedIndices, Value, OldValue)
+		return self.Changed:Connect(function(ChangedIndices, Value, OldValue)
 			if not OldValue and ChangedIndices[#ChangedIndices - 1] == _Indicies[#_Indicies] then
 				task.spawn(Callback, Value, ChangedIndices[#ChangedIndices])
 			end
@@ -366,16 +346,9 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 	end
 
 	function Replica:ListenToKeyRemoved(Indicies: { string | number } | string, Callback)
-		local _Indicies: { unknown } = (
-			if typeof(Indicies) == "string"
-				then string.split(
-					Indicies,
-					(string.find(Indicies, ".") and ".") or (string.find(Indicies, "/") and "/")
-				)
-				else Indicies
-		) :: { unknown }
+		local _Indicies = Parser(Indicies)
 
-		return Replica.Changed:Connect(function(ChangedIndices, Value, OldValue)
+		return self.Changed:Connect(function(ChangedIndices, Value, OldValue)
 			if not Value and ChangedIndices[#ChangedIndices - 1] == _Indicies[#_Indicies] then
 				task.spawn(Callback, OldValue, ChangedIndices[#ChangedIndices])
 			end
@@ -384,8 +357,8 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 
 	function Replica:Destroy()
 		FireBridge({ "Destroy", Config.Name, Id })
-		Replica.Destroying:Fire()
-		task.delay(1, Replica.Destroying.Destroy, Replica.Destroying)
+		self.Destroying:Fire()
+		task.delay(1, self.Destroying.Destroy, self.Destroying)
 		self.Changed:Destroy()
 		self.Cleaner:Destroy()
 		table.clear(self.Changed)
