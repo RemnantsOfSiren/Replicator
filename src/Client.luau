@@ -111,7 +111,7 @@ local function CreateReplicator(Name)
 			local LastIndex = Indicies[#Indicies]
 
 			if typeof(LastIndex) == "number" then
-				if not _Data[LastIndex] then
+				if _Data[LastIndex] ~= nil then
 					table.insert(_Data, LastIndex, Value)
 				elseif Value == nil then
 					table.remove(_Data, LastIndex)

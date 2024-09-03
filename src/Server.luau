@@ -146,8 +146,8 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 
 		for I = 1, #Indicies - 1 do
 			local Index = Indicies[I]
-			Pointer = Pointer[Index] or Pointer[tonumber(Index)]
-			if not Pointer then
+			Pointer = Pointer[Index] ~= nil and Pointer[Index] or Pointer[tonumber(Index)]
+			if Pointer == nil then
 				return warn(`Invalid Index: {Index}`)
 			end
 		end
@@ -234,7 +234,8 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 			end
 		end
 
-		local IndexType = Pointer[LastIndex] and "string" or "number"
+		local IndexType = Pointer[LastIndex] ~= nil and "string" or "number"
+
 		LastIndex = IndexType == "string" and LastIndex or tonumber(LastIndex)
 		local OldValue = Pointer[LastIndex]
 
