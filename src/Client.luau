@@ -1,5 +1,5 @@
 local Util = require(script.Parent.Table) :: { any }
-local Parser = require(script.Parent.Parser) :: ({ string | number } | string) -> { unknown }
+local Parser = require(script.Parent.Parser) :: ({ string | number } | string) -> { any }
 
 local BridgeNet = require(script.Parent.Parent.BridgeNet) :: { any }
 local LemonSignal = require(script.Parent.Parent.Signal) :: { any }
