@@ -4,5 +4,5 @@ return function(ObjectToParse: { string | number } | string)
 				ObjectToParse,
 				(string.find(ObjectToParse, "%.") and "%.") or (string.find(ObjectToParse, "/") and "/")
 			)
-			else ObjectToParse) :: { unknown }
+			else ObjectToParse) :: { any }
 end
