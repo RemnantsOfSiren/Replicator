@@ -234,7 +234,11 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 			end
 		end
 
-		local IndexType = if tonumber(LastIndex) then "number" else "string"
+		local IndexType = type(LastIndex)
+
+		if IndexType ~= "number" and IndexType ~= "string" then
+			return warn("Invalid Index Type")
+		end
 
 		LastIndex = IndexType == "string" and LastIndex or tonumber(LastIndex)
 		local OldValue = Pointer[LastIndex]
