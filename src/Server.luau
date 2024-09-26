@@ -198,11 +198,11 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 							local Keys = {}
 
 							for Key in CurrentValue do
-								if Util.Equals(CurrentValue[Key], Value) then
+								if Util.Equals(CurrentValue, {Value}) then
 									table.insert(Keys, Key)
 								end
 							end
-
+							
 							for _, Key in Keys do
 								local _Indicies = table.clone(Indicies)
 								_Indicies[#_Indicies + 1] = Key
