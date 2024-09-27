@@ -111,13 +111,15 @@ local function CreateReplicator(Name)
 			local LastIndex = Indicies[#Indicies]
 
 			if typeof(LastIndex) == "number" then
-				if _Data[LastIndex] ~= nil then
+				if _Data[LastIndex] == nil then
 					table.insert(_Data, LastIndex, Value)
 				elseif Value == nil then
 					table.remove(_Data, LastIndex)
+				else
+					_Data[LastIndex] = Value
 				end
 			else
-				_Data[Indicies[#Indicies]] = Value
+				_Data[LastIndex] = Value
 			end
 
 			Replica.Changed:Fire(Indicies, Value, OldValue)
