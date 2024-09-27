@@ -2,7 +2,7 @@ local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Util = require(script.Parent.Table) :: { any }
-local Parser = require(script.Parent.Parser) :: ({ string | number } | string) -> { unknown }
+local Parser = require(script.Parent.Parser) :: ({ string | number } | string) -> { any }
 
 local BridgeNet = require(script.Parent.Parent.BridgeNet) :: { any }
 local LemonSignal = require(script.Parent.Parent.Signal) :: { any }
@@ -191,18 +191,18 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 					end
 				elseif Operator:find("-") then
 					if type(CurrentValue) == "table" then
-						if type(Value) ~= "table" or typeof(Value) ~= "userdata" then
+						if type(Value) ~= "table" or type(Value) ~= "userdata" then
 							Replica.Changed:Fire(Indicies, nil, CurrentValue)
 							table.remove(CurrentValue, table.find(CurrentValue, Value))
 						else
 							local Keys = {}
 
 							for Key in CurrentValue do
-								if Util.Equals(CurrentValue[Key], Value) then
+								if Util.Equals(CurrentValue, {Value}) then
 									table.insert(Keys, Key)
 								end
 							end
-
+							
 							for _, Key in Keys do
 								local _Indicies = table.clone(Indicies)
 								_Indicies[#_Indicies + 1] = Key
@@ -234,7 +234,11 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 			end
 		end
 
-		local IndexType = Pointer[LastIndex] ~= nil and "string" or "number"
+		local IndexType = type(LastIndex)
+
+		if IndexType ~= "number" and IndexType ~= "string" then
+			return warn("Invalid Index Type")
+		end
 
 		LastIndex = IndexType == "string" and LastIndex or tonumber(LastIndex)
 		local OldValue = Pointer[LastIndex]
