@@ -8,6 +8,7 @@ local BridgeNet = require(script.Parent.Parent.BridgeNet) :: { any }
 local LemonSignal = require(script.Parent.Parent.Signal) :: { any }
 local Trove = require(script.Parent.Parent.Trove) :: { any }
 local Types = require(script.Parent.Types) :: { any }
+local SharedReplicaFunctions = require(script.Parent.SharedReplicaFunctions) :: { any }
 
 export type ReplicaConfig = {
 	Name: string,
@@ -93,6 +94,10 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 		Destroying = LemonSignal.new(),
 		Id = Id,
 	}
+
+	for Key, Value in pairs(SharedReplicaFunctions) do
+		Replica[Key] = Value
+	end
 
 	Replica.WriteLib = Replica.WriteLibModule and LoadWriteLib(Replica.WriteLibModule)
 
@@ -243,7 +248,7 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 		LastIndex = IndexType == "string" and LastIndex or tonumber(LastIndex)
 		local OldValue = Pointer[LastIndex]
 
-		if typeof(OldValue) == "table" and typeof(Value) == "table" and Util.Equals(OldValue, Value, true) then
+		if type(OldValue) == "table" and type(Value) == "table" and Util.Equals(OldValue, Value, true) then
 			return
 		end
 
@@ -300,61 +305,19 @@ function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
 			end
 
 			local OldData = Util.CopyTable(self.Data, true)
+
 			for Index, _Value in Value do
 				if not OldData[Index] or OldData[Index] ~= _Value then
 					self.Data[Index] = _Value
 				end
 			end
+			
 			self.Changed:Fire({}, self.Data, OldData)
 		else
 			Update(_Indicies, if typeof(Value) == "table" then Util.CopyTable(Value, true) else Value)
 		end
 
 		return nil
-	end
-
-	function Replica:ListenToChange(Indicies: { string | number } | string, Callback)
-		local _Indicies = Parser(Indicies)
-
-		return self.Changed:Connect(function(ChangedIndicies)
-			local Match = true
-			local _Data = self.Data
-			local _OldData = self._OldData
-
-			for I, Index in pairs(_Indicies) do
-				_Data = _Data[Index]
-				_OldData = _OldData[Index]
-
-				if Index ~= ChangedIndicies[I] then
-					Match = false
-					break
-				end
-			end
-
-			if Match then
-				task.spawn(Callback, _Data, _OldData)
-			end
-		end)
-	end
-
-	function Replica:ListenToNewKey(Indicies: { string | number } | string, Callback)
-		local _Indicies = Parser(Indicies)
-
-		return self.Changed:Connect(function(ChangedIndices, Value, OldValue)
-			if not OldValue and ChangedIndices[#ChangedIndices - 1] == _Indicies[#_Indicies] then
-				task.spawn(Callback, Value, ChangedIndices[#ChangedIndices])
-			end
-		end)
-	end
-
-	function Replica:ListenToKeyRemoved(Indicies: { string | number } | string, Callback)
-		local _Indicies = Parser(Indicies)
-
-		return self.Changed:Connect(function(ChangedIndices, Value, OldValue)
-			if not Value and ChangedIndices[#ChangedIndices - 1] == _Indicies[#_Indicies] then
-				task.spawn(Callback, OldValue, ChangedIndices[#ChangedIndices])
-			end
-		end)
 	end
 
 	function Replica:Destroy()

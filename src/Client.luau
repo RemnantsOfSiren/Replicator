@@ -1,15 +1,13 @@
 local Util = require(script.Parent.Table) :: { any }
-local Parser = require(script.Parent.Parser) :: ({ string | number } | string) -> { any }
 
+local Types = require(script.Parent.Types) :: { any }
+local Trove = require(script.Parent.Parent.Trove) :: { any }
 local BridgeNet = require(script.Parent.Parent.BridgeNet) :: { any }
 local LemonSignal = require(script.Parent.Parent.Signal) :: { any }
-local Trove = require(script.Parent.Parent.Trove) :: { any }
-local Types = require(script.Parent.Types) :: { any }
-
+local SharedReplicaFunctions = require(script.Parent.SharedReplicaFunctions) :: { any }
 
 local MainBridge = BridgeNet.ClientBridge("ReplicaServer")
 
-local Replica = newproxy(false)
 local Replicators = {}
 
 local function GetAllIndicies(Data)
@@ -46,7 +44,6 @@ local function CreateReplicator(Name)
 		end
 
 		local Replica = {
-			__type = Replica,
 			Changed = LemonSignal.new(),
 			Destroying = LemonSignal.new(),
 			WriteFunctionFlag = false,
@@ -60,6 +57,10 @@ local function CreateReplicator(Name)
 			_WriteCallbacks = {},
 			_OldData = Util.CopyTable(Data, true),
 		}
+
+		for Key, Value in pairs(SharedReplicaFunctions) do
+			Replica[Key] = Value
+		end
 
 		function Replica:ConnectOnClientEvent(Callback: (...any) -> ())
 			table.insert(Replica.ClientEvents, Callback)
@@ -129,59 +130,6 @@ local function CreateReplicator(Name)
 			return
 		end
 
-		function Replica:ListenToWrite(WriteFunction: string, Callback)
-			local Callbacks = Replica._WriteCallbacks[WriteFunction]
-			if not Callbacks then
-				Callbacks = {}
-				Replica._WriteCallbacks[WriteFunction] = Callbacks
-			end
-			table.insert(Callbacks, Callback)
-		end
-
-		function Replica:ListenToChange(Indicies: { string | number } | string, Callback)
-			local _Indicies = Parser(Indicies)
-
-			return Replica.Changed:Connect(function(ChangedIndicies)
-				local Match = true
-				local _Data = Replica.Data
-				local _OldData = Replica._OldData
-
-				for I, Index in pairs(_Indicies) do
-					_Data = _Data[Index]
-					_OldData = _OldData[Index]
-
-					if Index ~= ChangedIndicies[I] then
-						Match = false
-						break
-					end
-				end
-
-				if Match then
-					task.spawn(Callback, _Data, _OldData)
-				end
-			end)
-		end
-
-		function Replica:ListenToNewKey(Indicies: { string | number } | string, Callback)
-			local _Indicies = Parser(Indicies)
-
-			return Replica.Changed:Connect(function(ChangedIndices, Value, OldValue)
-				if not OldValue and ChangedIndices[#ChangedIndices - 1] == _Indicies[#_Indicies] then
-					task.spawn(Callback, Value, ChangedIndices[#ChangedIndices])
-				end
-			end)
-		end
-
-		function Replica:ListenToKeyRemoved(Indicies: { string | number } | string, Callback)
-			local _Indicies = Parser(Indicies)
-
-			return Replica.Changed:Connect(function(ChangedIndices, Value, OldValue)
-				if not Value and ChangedIndices[#ChangedIndices - 1] == _Indicies[#_Indicies] then
-					task.spawn(Callback, OldValue, ChangedIndices[#ChangedIndices])
-				end
-			end)
-		end
-
 		function Replica:FireServer(...)
 			MainBridge:Fire({ "Request", Name, Id, ... })
 		end
@@ -249,6 +197,7 @@ MainBridge:Connect(function(Args)
 					local Index = _Indicies[#_Indicies]
 					_Replica:Update(_Indicies, Pointer[Index], OldPointer[Index])
 				end
+				
 				return
 			end
 
@@ -304,9 +253,7 @@ task.spawn(function()
 	end
 end)
 
-local ReplicaClient = {
-	Replica = Replica,
-}
+local ReplicaClient = {}
 
 function ReplicaClient.ListenToNewReplica(Name: string, Callback: (Types.ClientReplica) -> ())
 	local Replicator = Replicators[Name] or CreateReplicator(Name)

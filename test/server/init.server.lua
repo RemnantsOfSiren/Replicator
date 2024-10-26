@@ -7,17 +7,11 @@ local Replica = Replicator.NewReplica({
     Name = "Test",
     Tags = { "Test" },
     Data = {
-        ["4062748404"] = {
-            Players = {},
-        }
+        ["Friends"] = {}
     },
     To = "All",
 })
 
-Replica:Set("4062748404/Players+", "4062748404")
-print(Replica.Data)
-
 task.delay(5, function()
-    Replica:Set("4062748404/Players/1", nil)
-    print(Replica.Data)
+    Replica:Set("Friends+", "Siren")
 end)
