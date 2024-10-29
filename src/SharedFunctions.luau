@@ -105,5 +105,9 @@ return {
         task.spawn(Callback, _Data[ParsedPath[#ParsedPath]])
 
         return self:ListenToChange(Path, Callback)
+    end,
+
+    AddCleanupTask= function(self: Types.ServerReplica | Types.ClientReplica, Task: () -> nil, CleanupMethod: string | boolean?)
+        self.__Cleaner:Add(Task, if not CleanupMethod then true else CleanupMethod)
     end
 }

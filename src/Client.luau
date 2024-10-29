@@ -59,6 +59,10 @@ local function NewReplica(Config: {Name: string, Id: string, Tags: { any }, Data
         ListenToKeyRemoved = ListenerFunctions.ListenToKeyRemoved,
     }, Replica)
 
+    self.__Cleaner:Connect(self.Destroying, function() 
+        self.__Cleaner:Destroy()
+    end)
+
     return self
 end
 
