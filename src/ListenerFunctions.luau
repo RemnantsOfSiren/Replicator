@@ -1,9 +1,6 @@
 --!strict
-local Sift = require(script.Parent.Parent.Sift) :: any
 local Types = require(script.Parent.Types)
 local Parser = require(script.Parent.Parser)
-
-local Array = Sift.Array
 
 type Data = {
     IsNumber: boolean,
@@ -91,7 +88,7 @@ return {
                 task.spawn(Callback, _Data, _OldData)
             end
         end)
-    end
+    end,
 
     ObserveChange = function(self: Types.ServerReplica | Types.ClientReplica, Path: Types.ValidPath, Callback: (...any) -> nil)
         local ParsedPath = Parser(Path)
