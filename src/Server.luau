@@ -103,7 +103,7 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
         self[Key] = Function
     end
 
-    self.__Cleaner:Connect(self.Destroying.Destroy, function() 
+    self.__Cleaner:Connect(self.Destroying, function() 
         self.__Cleaner:Destroy()
     end)
     
