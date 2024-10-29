@@ -66,26 +66,23 @@ return {
     ListenToChange = function(self: Types.ServerReplica | Types.ClientReplica, Path: Types.ValidPath, Callback: (...any) -> nil)
         local ParsedPath = Parser(Path)
 
-        return self.__Change:Connect(function(ChangedPath: { string | number })
-            local Match = true
+        return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
+            if #ParsedPath == #ChangedPath then
+                local Match = true
 
-            local _Data = self.__Data or self.Data
-            local _OldData = nil
-
-            for Index, Key in pairs(ParsedPath) do
-                local ChangedKey = ChangedPath[Index]
-                if ChangedKey then
-                    _Data = _Data[Key]
-    
-                    if Key ~= ChangedKey then
-                        Match = false
-                        break
+                for Index, Key in pairs(ParsedPath) do
+                    local ChangedKey = ChangedPath[Index]
+                    if ChangedKey then
+                        if Key ~= ChangedKey then
+                            Match = false
+                            break
+                        end
                     end
                 end
-            end
 
-            if Match then
-                task.spawn(Callback, _Data, _OldData)
+                if Match then
+                    task.spawn(Callback, NewValue, OldValue)
+                end
             end
         end)
     end,
@@ -107,7 +104,7 @@ return {
         return self:ListenToChange(Path, Callback)
     end,
 
-    AddCleanupTask= function(self: Types.ServerReplica | Types.ClientReplica, Task: () -> nil, CleanupMethod: string | boolean?)
+    AddCleanupTask = function(self: Types.ServerReplica | Types.ClientReplica, Task: () -> nil, CleanupMethod: string | boolean?)
         self.__Cleaner:Add(Task, if not CleanupMethod then true else CleanupMethod)
     end
 }

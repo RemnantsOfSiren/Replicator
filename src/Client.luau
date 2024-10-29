@@ -31,8 +31,11 @@ local Replica = {}
 Replica.__index = Replica
 
 function Replica:Destroy()
+    self.__Write:Destroy()
+    self.__Change:Destroy()
+
     self.Destroying:Fire()
-    self.__Changed:Destroy()
+    
     task.delay(0.1, self.Destroying.Destroy, self.Destroying)
     table.clear(self)
 end

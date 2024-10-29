@@ -37,12 +37,18 @@ function Replica:Write(Method: string, ...: any)
 end
 
 function Replica:Destroy()
+    self.__Write:Destroy()
+    self.__Change:Destroy()
+    
+    self.Destroying:Fire()
+
     Replicas[self.Id] = nil
+    
     Replication.destroyReplica.sendToAll({
         Name = self.Name,
         Id = self.Id
     })
-    self.Destroying:Fire()
+    
     task.delay(0.1, self.Destroying.Destroy, self.Destroying)
 end
 
@@ -92,7 +98,7 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
         Tags = Config.Tags,
 
         __Cleaner = Trove.new(),
-        __Wrote = Signal.new(),
+        __Write = Signal.new(),
         __Change = Signal.new(),
         Destroying = Signal.new(),
 
