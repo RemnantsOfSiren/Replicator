@@ -8,7 +8,7 @@ local Signal = require(script.Parent.Parent.Signal) :: any
 
 local Types = require(script.Parent.Types)
 local Replication = require(script.Parent.Replication)
-local ListenerFunctions = require(script.Parent.ListenerFunctions)
+local SharedFunctions = require(script.Parent.SharedFunctions)
 
 local Array = Sift.Array
 local Dictionary = Sift.Dictionary
@@ -97,11 +97,11 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
         Destroying = Signal.new(),
 
         __Parent = Config.Parent,
-        ListenToWrite = ListenerFunctions.ListenToWrite,
-        ListenToChange = ListenerFunctions.ListenToChange,
-        ListenToNewKey = ListenerFunctions.ListenToNewKey,
-        ListenToKeyRemoved = ListenerFunctions.ListenToKeyRemoved,
     }, Replica)
+
+    for Key, Function in SharedFunctions do
+        self[Key] = Function
+    end
 
     self.__Cleaner:Connect(self.Destroying.Destroy, function() 
         self.__Cleaner:Destroy()
