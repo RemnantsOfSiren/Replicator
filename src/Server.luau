@@ -102,6 +102,10 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
         ListenToNewKey = ListenerFunctions.ListenToNewKey,
         ListenToKeyRemoved = ListenerFunctions.ListenToKeyRemoved,
     }, Replica)
+
+    self.__Cleaner:Connect(self.Destroying.Destroy, function() 
+        self.__Cleaner:Destroy()
+    end)
     
     if Config.Data then
         self.__Data = Config.Data
