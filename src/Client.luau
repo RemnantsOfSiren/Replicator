@@ -70,6 +70,11 @@ Replicator.__index = Replicator
 
 function Replicator:AddListener(Callback)
     table.insert(self.__Listeners, Callback)
+    
+    for _, _Replica in pairs(self.__Replicas) do
+        task.spawn(Callback, _Replica)
+    end
+
     return function()
         table.remove(self.__Listeners, table.find(self.__Listeners, Callback))
     end
@@ -116,7 +121,7 @@ Replication.createReplica.listen(function(_Replica)
     end
 
     if not _Replicator.__Replicas[_Replica.Id] then
-        _Replicator:AddReplica(NewReplica(_Replica))
+        task.defer(_Replicator.AddReplica, _Replicator, NewReplica(_Replica))
     else
         warn("Replica already exists")
     end
@@ -197,7 +202,7 @@ Replication.getInitialReplicas.listen(function(_Replicas)
             _Replicator = NewReplicator(TempReplica.Name)
         end
 
-        _Replicator:AddReplica(TempReplica)
+        task.defer(_Replicator.AddReplica, _Replicator, TempReplica)
     end
 end)
 
