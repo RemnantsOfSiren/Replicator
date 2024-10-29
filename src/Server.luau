@@ -70,8 +70,12 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
 			if IsTable then
                 rawset(self, Key, ListenToTable(_Replica, Value, _Indicies))
             end
-			
-			rawset(Table, Key, Value)
+
+            if Sift.Array.is(Table) and Value == nil then
+                table.remove(Table, Key)
+            else
+                rawset(Table, Key, Value)
+            end
 		end,
 	})
 
