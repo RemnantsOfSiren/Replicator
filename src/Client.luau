@@ -6,7 +6,7 @@ local Signal = require(script.Parent.Parent.Signal) :: any
 local Types = require(script.Parent.Types)
 local Replication = require(script.Parent.Replication)
 
-local ListenerFunctions = require(script.Parent.ListenerFunctions)
+local SharedFunctions = require(script.Parent.SharedFunctions)
 
 local Dictionary = Sift.Dictionary
 local CopyDeep = Dictionary.copyDeep
@@ -52,12 +52,11 @@ local function NewReplica(Config: {Name: string, Id: string, Tags: { any }, Data
         __Parent = if Config.Parent then FindReplicaById(Config.Parent) else nil,
         WriteLib = Config.WriteLib,
         __WriteLib = Config.WriteLib and require(Config.WriteLib) :: {[any]: any} or nil,
-
-        ListenToWrite = ListenerFunctions.ListenToWrite,
-        ListenToChange = ListenerFunctions.ListenToChange,
-        ListenToNewKey = ListenerFunctions.ListenToNewKey,
-        ListenToKeyRemoved = ListenerFunctions.ListenToKeyRemoved,
     }, Replica)
+
+    for Key, Function in SharedFunctions do
+        self[Key] = Function
+    end
 
     self.__Cleaner:Connect(self.Destroying, function() 
         self.__Cleaner:Destroy()
