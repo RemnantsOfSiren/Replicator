@@ -3,34 +3,24 @@
 registry = "test"
 
 [[package]]
+name = "csqrl/sift"
+version = "0.0.9"
+dependencies = []
+
+[[package]]
 name = "data-oriented-house/lemonsignal"
 version = "1.10.0"
 dependencies = []
 
 [[package]]
-name = "ffrostflame/tablekit"
-version = "0.2.4"
+name = "ffrostflame/bytenet"
+version = "0.4.6"
 dependencies = []
-
-[[package]]
-name = "ffrostflame/wally-instance-manager"
-version = "0.1.0"
-dependencies = []
-
-[[package]]
-name = "pysephwasntavailable/remotepacketsizecounter"
-version = "2.4.1"
-dependencies = []
-
-[[package]]
-name = "remnantsofsiren/bridgenet2"
-version = "1.0.1"
-dependencies = [["RemotePacketSizeCounter", "pysephwasntavailable/remotepacketsizecounter@2.4.1"], ["TableKit", "ffrostflame/tablekit@0.2.4"], ["wallyInstanceManager", "ffrostflame/wally-instance-manager@0.1.0"]]
 
 [[package]]
 name = "remnantsofsiren/replicator"
-version = "1.1.0"
-dependencies = [["BridgeNet", "remnantsofsiren/bridgenet2@1.0.1"], ["Signal", "data-oriented-house/lemonsignal@1.10.0"], ["Trove", "sleitnick/trove@1.4.0"]]
+version = "2.0.0"
+dependencies = [["ByteNet", "ffrostflame/bytenet@0.4.6"], ["Sift", "csqrl/sift@0.0.9"], ["Signal", "data-oriented-house/lemonsignal@1.10.0"], ["Trove", "sleitnick/trove@1.4.0"]]
 
 [[package]]
 name = "sleitnick/trove"

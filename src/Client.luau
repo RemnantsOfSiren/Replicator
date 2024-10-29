@@ -1,267 +1,205 @@
-local Util = require(script.Parent.Table) :: { any }
+--!strict
+local Sift = require(script.Parent.Parent.Sift) :: any
+local Trove = require(script.Parent.Parent.Trove) :: any
+local Signal = require(script.Parent.Parent.Signal) :: any
 
-local Types = require(script.Parent.Types) :: { any }
-local Trove = require(script.Parent.Parent.Trove) :: { any }
-local BridgeNet = require(script.Parent.Parent.BridgeNet) :: { any }
-local LemonSignal = require(script.Parent.Parent.Signal) :: { any }
-local SharedReplicaFunctions = require(script.Parent.SharedReplicaFunctions) :: { any }
+local Types = require(script.Parent.Types)
+local Replication = require(script.Parent.Replication)
 
-local MainBridge = BridgeNet.ClientBridge("ReplicaServer")
+local ListenerFunctions = require(script.Parent.ListenerFunctions)
+
+local Dictionary = Sift.Dictionary
+local CopyDeep = Dictionary.copyDeep
 
 local Replicators = {}
 
-local function GetAllIndicies(Data)
-	local Indicies = {}
+local function FindReplicaById(Id: string?): Types.ClientReplica?
+    if Id then
+        for _, _Replicator in pairs(Replicators) do
+            for _, _Replica in pairs(_Replicator.__Replicas) do
+                if _Replica.Id == Id then
+                    return _Replica
+                end
+            end
+        end
+    end
 
-	for Index, Value in pairs(Data) do
-		if typeof(Value) == "table" then
-			local SubIndicies = { Index }
-			for _, SubIndex in GetAllIndicies(Value) do
-				table.insert(Indicies, {
-					unpack(table.clone(SubIndicies)),
-					SubIndex,
-				})
-			end
-			continue
-		end
-
-		table.insert(Indicies, { Index })
-	end
-
-	return Indicies
+    return nil
 end
 
-local function CreateReplicator(Name)
-	local Replicator = {}
-	Replicator.Replicas = {}
+local Replica = {}
+Replica.__index = Replica
 
-	Replicator.Added = LemonSignal.new()
-	Replicators[Name] = Replicator
-
-	function Replicator.AddNewReplica(Id, Tags, Data, WriteLib)
-		if Replicator.Replicas[Id] then
-			return
-		end
-
-		local Replica = {
-			Changed = LemonSignal.new(),
-			Destroying = LemonSignal.new(),
-			WriteFunctionFlag = false,
-			WriteLib = WriteLib and require(WriteLib),
-			Id = Id,
-			Tags = Tags,
-			Data = Data,
-			ClientEvents = {},
-			Cleaner = Trove.new(),
-			_Callbacks = {},
-			_WriteCallbacks = {},
-			_OldData = Util.CopyTable(Data, true),
-		}
-
-		for Key, Value in pairs(SharedReplicaFunctions) do
-			Replica[Key] = Value
-		end
-
-		function Replica:ConnectOnClientEvent(Callback: (...any) -> ())
-			table.insert(Replica.ClientEvents, Callback)
-
-			return function()
-				table.remove(Replica.ClientEvents, table.find(Replica.ClientEvents, Callback))
-			end
-		end
-
-		function Replica:Write(FunctionName: string, ...)
-			if not Replica.WriteLib then
-				warn(`No WriteLib exists for {Name} replica!`)
-				return
-			end
-
-			if not Replica.WriteLib[FunctionName] then
-				return
-			end
-
-			if self.WriteFunctionFlag == false then
-				return
-			end
-
-			local ReturnedValues = Replica.WriteLib[FunctionName](Replica, ...)
-
-			local Callbacks = Replica._WriteCallbacks
-
-			if Callbacks[FunctionName] then
-				for _, Callback in Callbacks do
-					task.spawn(Callback, ...)
-				end
-			end
-
-			return ReturnedValues
-		end
-
-		function Replica:Update(Indicies, Value, OldValue)
-			Replica._OldData = Util.CopyTable(Replica.Data, true)
-			local _Data = Replica.Data
-
-			for I = 1, #Indicies - 1 do
-				_Data = _Data[Indicies[I]]
-			end
-
-			if not _Data then
-				return
-			end
-
-			local LastIndex = Indicies[#Indicies]
-
-			if typeof(LastIndex) == "number" then
-				if _Data[LastIndex] == nil then
-					table.insert(_Data, LastIndex, Value)
-				elseif Value == nil then
-					table.remove(_Data, LastIndex)
-				else
-					_Data[LastIndex] = Value
-				end
-			else
-				_Data[LastIndex] = Value
-			end
-
-			Replica.Changed:Fire(Indicies, Value, OldValue)
-		end
-
-		function Replica:Set() -- Add this so that the client doesn't error out whenever the server runs :Set
-			return
-		end
-
-		function Replica:FireServer(...)
-			MainBridge:Fire({ "Request", Name, Id, ... })
-		end
-
-		function Replica:AddCleanupTask(Task: () -> nil, OptionalCleanupMethod: any?)
-			Replica.Cleaner:Add(Task, OptionalCleanupMethod or true)
-		end
-
-		function Replica:Destroy()
-			Replicator.Replicas[Id] = nil
-			Replica.Destroying:Fire()
-			task.delay(1, Replica.Destroying.Destroy, Replica.Destroying)
-			Replica.Cleaner:Destroy()
-			Replica.Changed:Destroy()
-			table.clear(Replica)
-		end
-
-		Replicator.Replicas[Id] = Replica
-		Replicator.Added:Fire(Replica)
-	end
-
-	return Replicator
+function Replica:Destroy()
+    self.Destroying:Fire()
+    self.__Changed:Destroy()
+    task.delay(0.1, self.Destroying.Destroy, self.Destroying)
+    table.clear(self)
 end
 
-MainBridge:Connect(function(Args)
-	if Args[1] == "FireClient" then
-		local Name, Id = Args[2], Args[3]
-		local Replicator = Replicators[Name]
-		if Replicator then
-			local _Replica = Replicator.Replicas[Id]
-			if _Replica then
-				for _, Callback in _Replica.ClientEvents do
-					task.spawn(Callback, unpack(Args, 4))
-				end
-			end
-		end
-	elseif Args[1] == "Create" then
-		local _, Name, Id, Tags, Data, WriteLib = unpack(Args)
-		local Replicator = Replicators[Name] or CreateReplicator(Name)
-		task.spawn(Replicator.AddNewReplica, Id, Tags, Data, WriteLib)
-	elseif Args[1] == "Changed" then
-		local _, Name, Id, Indicies, Value, OldValue = unpack(Args)
-		local Replicator = Replicators[Name]
+local function NewReplica(Config: {Name: string, Id: string, Tags: { any }, Data: any, WriteLib: ModuleScript?, Parent: string?}): Types.ClientReplica
+    local self = setmetatable({
+        Id = Config.Id,
+        Name = Config.Name,
+        Tags = Config.Tags,
+        Data = Config.Data,
 
-		if Replicator then
-			local _Replica = Replicator.Replicas[Id]
+        __Cleaner = Trove.new(),
+        __Write = Signal.new(),
+        __Change = Signal.new(),
+        Destroying = Signal.new(),
+        
+        __Parent = if Config.Parent then FindReplicaById(Config.Parent) else nil,
+        WriteLib = Config.WriteLib,
+        __WriteLib = Config.WriteLib and require(Config.WriteLib) :: {[any]: any} or nil,
 
-			if not _Replica then
-				return
-			end
+        ListenToWrite = ListenerFunctions.ListenToWrite,
+        ListenToChange = ListenerFunctions.ListenToChange,
+        ListenToNewKey = ListenerFunctions.ListenToNewKey,
+        ListenToKeyRemoved = ListenerFunctions.ListenToKeyRemoved,
+    }, Replica)
 
-			if #Indicies == 0 then
-				Indicies = GetAllIndicies(Value)
+    return self
+end
 
-				for _, _Indicies in Indicies do
-					local Pointer = Value
-					local OldPointer = OldValue
+local Replicator = {}
+Replicator.__index = Replicator
 
-					for I = 1, #_Indicies - 1 do
-						local Index = _Indicies[I]
-						Pointer = Pointer[Index]
-						OldPointer = OldPointer[Index]
-					end
+function Replicator:AddListener(Callback)
+    table.insert(self.__Listeners, Callback)
+    return function()
+        table.remove(self.__Listeners, table.find(self.__Listeners, Callback))
+    end
+end
 
-					local Index = _Indicies[#_Indicies]
-					_Replica:Update(_Indicies, Pointer[Index], OldPointer[Index])
-				end
-				
-				return
-			end
+function Replicator:AddReplica(_Replica)
+    self.__Replicas[_Replica.Id] = _Replica
+    for _, Listener in self.__Listeners do
+        task.spawn(Listener, _Replica)
+    end
+end
 
-			_Replica:Update(Indicies, Value, OldValue)
-		end
-	elseif Args[1] == "Write" then
-		local Name = Args[2]
-		local Id = Args[3]
-		local FunctionName = Args[4]
+local function NewReplicator(Name: string)
+    if Replicators[Name] then
+        return Replicators[Name]
+    end
 
-		local NewArgs = {}
-		for i = 5, #Args do
-			table.insert(NewArgs, Args[i])
-		end
+    local self = setmetatable({
+        Name = Name,
+        __Replicas = {},
+        __Listeners = {},
+    }, Replicator)
 
-		local Replicator = Replicators[Name]
+    Replicators[Name] = self
 
-		if Replicator then
-			local _Replica = Replicator.Replicas[Id]
+    return self
+end
 
-			_Replica.WriteFunctionFlag = true
-			_Replica.WriteLib[FunctionName](_Replica, table.unpack(NewArgs))
-			_Replica.WriteFunctionFlag = false
+local function Listener(Name: string, Callback: (...any) -> nil)
+    local _Replicator = Replicators[Name]
 
-			local Callbacks = _Replica._WriteCallbacks[FunctionName]
-			if Callbacks then
-				for _, Callback in ipairs(Callbacks) do
-					task.spawn(Callback, table.unpack(NewArgs))
-				end
-			end
-		end
-	elseif Args[1] == "Destroy" then
-		local _, Name, Id = unpack(Args)
-		local Replicator = Replicators[Name]
-		if Replicator then
-			local _Replica = Replicator.Replicas[Id]
-			if _Replica then
-				_Replica:Destroy()
-			end
-		end
-	end
+    if not _Replicator then
+        _Replicator = NewReplicator(Name)
+    end
+
+    return _Replicator:AddListener(Callback)
+end
+
+Replication.createReplica.listen(function(_Replica)
+    local _Replicator = Replicators[_Replica.Name]
+
+    if not _Replicator then
+        _Replicator = NewReplicator(_Replica.Name)
+    end
+
+    if not _Replicator.__Replicas[_Replica.Id] then
+        _Replicator:AddReplica(NewReplica(_Replica))
+    else
+        warn("Replica already exists")
+    end
 end)
 
-task.spawn(function()
-	local Data = MainBridge:InvokeServerAsync()
+Replication.destroyReplica.listen(function(Data)
+    local _Replicator = Replicators[Data.Name]
+    if _Replicator then
+        local _Replica = _Replicator.__Replicas[Data.Id]
 
-	for Name, Replicas in Data do
-		local Replicator = Replicators[Name] or CreateReplicator(Name)
-
-		for Id, Info in pairs(Replicas) do
-			task.spawn(Replicator.AddNewReplica, Id, Info.Tags, Info.Data, Info.WriteLib)
-		end
-	end
+        if _Replica then
+            _Replica:Destroy()
+            _Replicator.__Replicas[Data.Id] = nil
+        end
+    end
 end)
 
-local ReplicaClient = {}
+type Packet = {
+    Name: string,
+    Id: string,
+    Changes: { 
+        {Time: number, Path: { string | number }, Value: any}
+    }
+}
 
-function ReplicaClient.ListenToNewReplica(Name: string, Callback: (Types.ClientReplica) -> ())
-	local Replicator = Replicators[Name] or CreateReplicator(Name)
-	for _, _Replica in pairs(Replicator.Replicas) do
-		task.spawn(Callback, _Replica)
-	end
+Replication.replicateChanges.listen(function(Data: Packet)
+    local _Replicator = Replicators[Data.Name]
 
-	return Replicator.Added:Connect(Callback)
-end
+    if _Replicator then
+        local _Replica = _Replicator.__Replicas[Data.Id]
 
-return ReplicaClient
+        if _Replica then
+            table.sort(Data.Changes, function(A, B)
+                return A.Time < B.Time
+            end)
+
+            local AlteredKeys = {}
+
+            for _, Change in Data.Changes do
+                task.spawn(function()
+                    local Path = Change.Path
+                    local _Data = _Replica.Data
+ 
+                    if table.find(AlteredKeys, table.concat(Path, ":")) then
+                        print("This was already altered")
+                        return
+                    end
+
+                    for I = 1, #Path - 1 do
+                        local Key = Path[I]
+                        _Data = _Data[Key]
+                        
+                        if not _Data then
+                            break
+                        end
+                    end
+                    
+                    if _Data then
+                        table.insert(AlteredKeys, table.concat(Path, ":"))
+                        local LastKey = Path[#Path]
+                        local OldData = if typeof(_Data[LastKey]) == "table" then CopyDeep(_Data[LastKey]) else _Data[LastKey]
+                        _Data[LastKey] = Change.Value
+                        _Replica.__Change:Fire(Path, Change.Value, OldData)
+                    end
+                end)
+            end
+        end
+    end
+end)
+
+Replication.getInitialReplicas.listen(function(_Replicas) 
+    for _, _Replica in _Replicas do
+        local TempReplica = NewReplica(_Replica)
+
+        local _Replicator = Replicators[TempReplica.Name]
+        
+        if not _Replicator then
+            _Replicator = NewReplicator(TempReplica.Name)
+        end
+
+        _Replicator:AddReplica(TempReplica)
+    end
+end)
+
+Replication.getInitialReplicas.send()
+
+return table.freeze({
+    ListenToNewReplica = Listener,
+})

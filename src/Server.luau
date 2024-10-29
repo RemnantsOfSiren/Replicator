@@ -1,339 +1,200 @@
+--!strict
+local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Util = require(script.Parent.Table) :: { any }
-local Parser = require(script.Parent.Parser) :: ({ string | number } | string) -> { any }
+local Sift = require(script.Parent.Parent.Sift) :: any
+local Trove = require(script.Parent.Parent.Trove) :: any
+local Signal = require(script.Parent.Parent.Signal) :: any
 
-local BridgeNet = require(script.Parent.Parent.BridgeNet) :: { any }
-local LemonSignal = require(script.Parent.Parent.Signal) :: { any }
-local Trove = require(script.Parent.Parent.Trove) :: { any }
-local Types = require(script.Parent.Types) :: { any }
-local SharedReplicaFunctions = require(script.Parent.SharedReplicaFunctions) :: { any }
+local Types = require(script.Parent.Types)
+local Replication = require(script.Parent.Replication)
+local ListenerFunctions = require(script.Parent.ListenerFunctions)
 
-export type ReplicaConfig = {
-	Name: string,
-	Tags: { any }?,
-	Data: { any },
-	To: { Player } | Player | "All",
-	WriteLib: ModuleScript?,
-}
+local Array = Sift.Array
+local Dictionary = Sift.Dictionary
+local CopyDeep = Dictionary.copyDeep
 
 local Replicas = {}
-local WriteLibCache = {}
 
-local function LoadWriteLib(WriteLibModule: ModuleScript)
-	local FoundWriteLib = WriteLibCache[WriteLibModule]
+local Replica = {}
+Replica.__index = Replica
 
-	if FoundWriteLib then -- Already cached a WriteLib module
-		return FoundWriteLib
-	end
-
-	if WriteLibModule.ClassName ~= "ModuleScript" then
-		warn("WriteLib must be a ModuleScript!")
-		return
-	end
-
-	if not WriteLibModule:IsDescendantOf(ReplicatedStorage) then
-		warn("WriteLib must be a descendant of ReplicatedStorage!")
-		return
-	end
-
-	local LoadedWriteLib = require(WriteLibModule)
-
-	if typeof(LoadedWriteLib) ~= "table" then
-		warn("WriteLib must return a table!")
-		return
-	end
-
-	WriteLibCache[WriteLibModule] = LoadedWriteLib
-
-	return LoadedWriteLib
+function Replica:Write(Method: string, ...: any)
+    if self.__WriteLib and self.__WriteLib[Method] then
+        local Return = { self.__WriteLib[Method](self, ...) }
+        
+        local Packet = { Name = self.Name, Id = self.Id, Method = Method, Args = { ... } }
+        if self.To == "ALL" or not self.To then
+            Replication.replicateWrite.sendToAll(Packet)
+        elseif typeof(self.To) == "table" then
+            Replication.replicateWrite.sendToList(Packet, self.To)
+        else
+            Replication.replicateWrite.sendTo(Packet, self.To)
+        end
+        
+        return unpack(Return)
+    end
 end
 
-local MainBridge = BridgeNet.ServerBridge("ReplicaServer")
-
-MainBridge.OnServerInvoke = function(Player)
-	local _Replicas = {}
-
-	for Id, Replica in pairs(Replicas) do
-		if
-			(typeof(Replica.To) == "string" and Replica.To:lower() == "all")
-			or (typeof(Replica.To) == "table" and table.find(Replica.To, Player))
-			or (Replica.To == Player)
-		then
-			if not _Replicas[Replica.Name] then
-				_Replicas[Replica.Name] = {}
-			end
-
-			_Replicas[Replica.Name][Id] = {
-				Tags = Util.CopyTable(Replica.Tags, true),
-				Data = Util.CopyTable(Replica.Data, true),
-				WriteLib = Replica.WriteLibModule,
-			}
-		end
-	end
-
-	return _Replicas
+function Replica:Destroy()
+    Replicas[self.Id] = nil
+    Replication.destroyReplica.sendToAll({
+        Name = self.Name,
+        Id = self.Id
+    })
+    self.Destroying:Fire()
+    task.delay(0.1, self.Destroying.Destroy, self.Destroying)
 end
 
-local ReplicaServer = {}
+local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[number]: any}?)
+	local Method = setmetatable({}, {
+		__index = function(_, Key) 
+            return rawget(Table, Key)
+        end,
+        __tostring = function()
+            return "Replicated Table"
+        end,
+		__newindex = function(self, Key, Value)
+			local IsTable = type(Value) == "table"
+			local _Indicies = table.clone(Indicies or {})
+            
+			_Indicies[#_Indicies + 1] = Key
+            _Replica.__Change:Fire(_Indicies, Value, if type(Table[Key]) == "table" then CopyDeep(Table[Key]) else Table[Key])
 
-function ReplicaServer.NewReplica(Config: ReplicaConfig): Types.ServerReplica
-	local Id = HttpService:GenerateGUID(false)
-
-	local WriteFunctionFlag: boolean = false
-
-	local Replica = {
-		WriteLibModule = Config.WriteLib,
-		Tags = Config.Tags or {},
-		To = Config.To,
-		Name = Config.Name,
-		Cleaner = Trove.new(),
-		ServerEvents = {},
-		Changed = LemonSignal.new(),
-		Destroying = LemonSignal.new(),
-		Id = Id,
-	}
-
-	for Key, Value in pairs(SharedReplicaFunctions) do
-		Replica[Key] = Value
-	end
-
-	Replica.WriteLib = Replica.WriteLibModule and LoadWriteLib(Replica.WriteLibModule)
-
-	local function FireBridge(Args)
-		if Config.To == "All" then
-			MainBridge:Fire(BridgeNet.AllPlayers(), Args)
-		elseif typeof(Config.To) == "table" then
-			MainBridge:Fire(BridgeNet.Players(Config.To), Args)
-		else
-			MainBridge:Fire(Config.To, Args)
-		end
-	end
-
-	function Replica:ConnectOnServerEvent(Callback: (...any) -> ())
-		table.insert(self.ServerEvents, Callback)
-
-		return function()
-			table.remove(self.ServerEvents, table.find(self.ServerEvents, Callback))
-		end
-	end
-
-	FireBridge({ "Create", Config.Name, Id, Replica.Tags, Config.Data, Replica.WriteLibModule })
-
-	Replica.Changed:Connect(function(Indices, Value, OldValue)
-		FireBridge({ "Changed", Config.Name, Id, Indices, Value, OldValue })
-	end)
-
-	Replica.Cleaner:Add(
-		MainBridge:Connect(function(Player, Args)
-			local Event = Args[1]
-
-			if Event ~= "Request" then
-				return
-			end
-
-			if Args[2] == Config.Name and Args[3] == Id then
-				for _, Callback in Replica.ServerEvents do
-					task.spawn(Callback, Player, table.unpack(Args, 4))
-				end
-			end
-		end),
-		"Disconnect"
-	)
-
-	Replica.Data = Config.Data
-	Replica._OldData = Util.CopyTable(Replica.Data, true)
-
-	local function Update(Indicies: { string | number }, Value: any)
-		Replica._OldData = Util.CopyTable(Replica.Data, true)
-		local Pointer = Replica.Data
-
-		for I = 1, #Indicies - 1 do
-			local Index = Indicies[I]
-			Pointer = Pointer[Index] ~= nil and Pointer[Index] or Pointer[tonumber(Index)]
-			if Pointer == nil then
-				return warn(`Invalid Index: {Index}`)
-			end
-		end
-
-		local LastIndex = Indicies[#Indicies]
-		local Operator = if typeof(LastIndex) == "string" then LastIndex:match("[+%%-*/^]$") else nil
-
-		if Operator then
-			LastIndex = LastIndex:sub(1, LastIndex:find(Operator) - 1)
-			Indicies[#Indicies] = LastIndex
-
-			if type(Value) == "table" and not (Operator:find("+") or Operator:find("-")) then
-				return warn("Invalid Operator for Table")
-			end
-
-			local CurrentValue = Pointer[LastIndex]
-
-			if CurrentValue then
-				if Operator:find("+") then
-					if typeof(CurrentValue) == "table" then
-						Value = Util.JoinTables(CurrentValue, { Value })
-
-						local Keys = {}
-
-						for Key in Value do
-							if not CurrentValue[Key] then
-								table.insert(Keys, Key)
-							end
-						end
-
-						for _, Key in Keys do
-							local _Indicies = table.clone(Indicies)
-							_Indicies[#_Indicies + 1] = Key
-							Replica.Changed:Fire(_Indicies, Value[Key], nil)
-							CurrentValue[Key] = Value[Key]
-						end
-
-						return
-					else
-						CurrentValue += Value
-					end
-				elseif Operator:find("-") then
-					if type(CurrentValue) == "table" then
-						if type(Value) ~= "table" or type(Value) ~= "userdata" then
-							Replica.Changed:Fire(Indicies, nil, CurrentValue)
-							table.remove(CurrentValue, table.find(CurrentValue, Value))
-						else
-							local Keys = {}
-
-							for Key in CurrentValue do
-								if Util.Equals(CurrentValue, {Value}) then
-									table.insert(Keys, Key)
-								end
-							end
-							
-							for _, Key in Keys do
-								local _Indicies = table.clone(Indicies)
-								_Indicies[#_Indicies + 1] = Key
-								if typeof(Key) == "number" then
-									Replica.Changed:Fire(_Indicies, nil, CurrentValue[Key])
-									table.remove(CurrentValue, Key)
-								else
-									Replica.Changed:Fire(_Indicies, nil, CurrentValue[Key])
-									CurrentValue[Key] = nil
-								end
-							end
-						end
-
-						return
-					else
-						CurrentValue -= Value
-					end
-				elseif Operator:find("*") then
-					CurrentValue *= Value
-				elseif Operator:find("/") then
-					CurrentValue /= Value
-				elseif Operator:find("^") then
-					CurrentValue ^= Value
-				elseif Operator:find("%") then
-					CurrentValue %= Value
-				end
-				
-				Value = CurrentValue
-			end
-		end
-
-		local IndexType = type(LastIndex)
-
-		if IndexType ~= "number" and IndexType ~= "string" then
-			return warn("Invalid Index Type")
-		end
-
-		LastIndex = IndexType == "string" and LastIndex or tonumber(LastIndex)
-		local OldValue = Pointer[LastIndex]
-
-		if type(OldValue) == "table" and type(Value) == "table" and Util.Equals(OldValue, Value, true) then
-			return
-		end
-
-		if OldValue ~= Value then
-			Pointer[LastIndex] = Value
-			Indicies[#Indicies] = LastIndex
-			Replica.Changed:Fire(Indicies, Value, OldValue)
-		end
-
-		return
-	end
-
-	function Replica:FireClient(...)
-        FireBridge({ "FireClient", Config.Name, Id, ... })
-	end
-
-	function Replica:AddCleanupTask(Task: () -> nil, OptionalCleanupMethod: any?)
-		self.Cleaner:Add(Task, OptionalCleanupMethod or true)
-	end
-
-	function Replica:Write(WriteFunction: string, ...)
-		if self.WriteLib then
-			if not Replica.WriteLib[WriteFunction] then
-				warn(`Write Function {WriteFunction} was not in WriteLib!`)
-				return
-			end
-
-			local Func = Replica.WriteLib[WriteFunction]
-
-			if WriteFunctionFlag then
-				return Func(Replica, ...)
-			end
-
-			WriteFunctionFlag = true
-
-			local ReturnedValues = Func(Replica, ...)
-
-			WriteFunctionFlag = false
-
-			FireBridge({ "Write", Replica.Name, Id, WriteFunction, ... })
-
-			return ReturnedValues
-		end
-		
-		return nil
-	end
-
-	function Replica:Set(Indicies: { string | number } | string, Value)
-		local _Indicies = Parser(Indicies)
-
-		if #_Indicies == 0 and typeof(Value) == "table" then
-			if Util.Equals(self.Data, Value, true) then
-				return
-			end
-
-			local OldData = Util.CopyTable(self.Data, true)
-
-			for Index, _Value in Value do
-				if not OldData[Index] or OldData[Index] ~= _Value then
-					self.Data[Index] = _Value
-				end
-			end
+			if IsTable then
+                rawset(self, Key, ListenToTable(_Replica, Value, _Indicies))
+            end
 			
-			self.Changed:Fire({}, self.Data, OldData)
-		else
-			Update(_Indicies, if typeof(Value) == "table" then Util.CopyTable(Value, true) else Value)
+			rawset(Table, Key, Value)
+		end,
+	})
+
+	for Index, Value in Table do
+		if type(Value) == "table" then
+			Method[Index] = Value
 		end
-
-		return nil
 	end
 
-	function Replica:Destroy()
-		FireBridge({ "Destroy", Config.Name, Id })
-		self.Destroying:Fire()
-		task.delay(1, self.Destroying.Destroy, self.Destroying)
-		self.Changed:Destroy()
-		self.Cleaner:Destroy()
-		table.clear(self.Changed)
-		table.clear(self.Cleaner)
-		table.clear(self)
-	end
-
-	Replicas[Id] = Replica
-
-	return Replica
+	return Method
 end
 
-return ReplicaServer
+local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, WriteLib: ModuleScript?, To: Types.ToOptions?, Parent: Types.ServerReplica?}): Types.ServerReplica
+    if Config.Parent and Config.Parent.To then
+        Config.To = Config.Parent.To
+    elseif not Config.To then
+        Config.To = "All"
+    end
+
+    local self = setmetatable({
+        To = Config.To,
+        Id = HttpService:GenerateGUID(false),
+        Name = Config.Name,
+        Tags = Config.Tags,
+
+        __Cleaner = Trove.new(),
+        __Wrote = Signal.new(),
+        __Change = Signal.new(),
+        Destroying = Signal.new(),
+
+        __Parent = Config.Parent,
+        ListenToWrite = ListenerFunctions.ListenToWrite,
+        ListenToChange = ListenerFunctions.ListenToChange,
+        ListenToNewKey = ListenerFunctions.ListenToNewKey,
+        ListenToKeyRemoved = ListenerFunctions.ListenToKeyRemoved,
+    }, Replica)
+    
+    if Config.Data then
+        self.__Data = Config.Data
+        self.Data = ListenToTable(self, self.__Data)
+    end
+    
+    if Config.WriteLib and Config.WriteLib:IsA("ModuleScript") and Config.WriteLib:IsDescendantOf(game.ReplicatedStorage) then
+        self.WriteLib = Config.WriteLib
+        self.__WriteLib = require(self.WriteLib) :: { [string]: (self: Types.ServerReplica, ...any) -> unknown }
+    elseif Config.WriteLib then
+        warn("WriteLib must be a ModuleScript and a descendant of ReplicatedStorage")
+    end
+
+    local Changes = {}
+
+    self.__Change:Connect(function(Path, Value)
+        table.insert(Changes, { Time = os.clock(), Path = Path, Value = Value })
+    end)
+
+    self.__Cleaner:Connect(RunService.Heartbeat, function() 
+        if #Changes > 0 then
+            local Keys = {}
+            
+            table.sort(Changes, function(A, B)
+                return A.Time > B.Time
+            end)
+
+            Array.filter(Changes, function(Change)
+                local Id = table.concat(Change.Path, ":")
+                if not Keys[Id] then
+                    Keys[Id] = true
+                    return true
+                end
+                return false
+            end)
+
+            local Packet: Types.Packet = {
+                Name = self.Name,
+                Id = self.Id,
+                Changes = Changes
+            }
+
+            if self.To == "All" or not self.To then
+                Replication.replicateChanges.sendToAll(Packet)
+            elseif typeof(self.To) == "table" then
+                Replication.replicateChanges.sendToList(Packet, self.To)
+            else
+                Replication.replicateChanges.sendTo(Packet, self.To)
+            end
+
+            table.clear(Changes)
+        end
+    end)
+
+    local CreatePacket = {
+        Id = self.Id,
+        Name = self.Name,
+        Tags = self.Tags,
+        Data = Config.Data and CopyDeep(Config.Data),
+        WriteLib = self.WriteLib,
+        Parent = Config.Parent and Config.Parent.Id
+    }
+
+    if Config.To == "All" or not Config.To then
+        task.spawn(Replication.createReplica.sendToAll, CreatePacket)
+    elseif typeof(Config.To) == "table" then
+        task.spawn(Replication.createReplica.sendToList, CreatePacket, Config.To)
+    else
+        task.spawn(Replication.createReplica.sendTo, CreatePacket, Config.To)
+    end
+
+    Replicas[self.Id] = self
+
+    return self
+end
+
+Replication.getInitialReplicas.listen(function(_, Player)
+    local _Replicas = {}
+
+    for _, _Replica in Replicas do        
+        table.insert(_Replicas, {
+            Name = _Replica.Name,
+            Id = _Replica.Id,
+            Tags = _Replica.Tags,
+            Data = if _Replica.__Data then CopyDeep(_Replica.__Data) else nil,
+            WriteLib = _Replica.WriteLib,
+            Parent = _Replica.__Parent and _Replica.__Parent.Id
+        })
+    end
+
+    Replication.getInitialReplicas.sendTo(_Replicas, Player)
+end)
+
+return table.freeze({
+    NewReplica = NewReplica
+})
