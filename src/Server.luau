@@ -52,10 +52,8 @@ function Replica:Write(Method: string, ...: any)
 end
 
 function Replica:Destroy()
-    self.__Write:Destroy()
-    self.__Change:Destroy()
-    
     self.Destroying:Fire()
+    task.defer(self.__Cleaner.Destroy, self.__Cleaner)
 
     Replicas[self.Id] = nil
     
@@ -64,7 +62,7 @@ function Replica:Destroy()
         Id = self.Id
     })
     
-    task.delay(0.1, self.Destroying.Destroy, self.Destroying)
+    table.clear(self)
 end
 
 local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[number]: any}?)
@@ -91,6 +89,15 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
             else
                 if (IsTable and not Dictionary.equalsDeep(Value, Table[Key])) or rawget(Table, Key) ~= Value then
                     Updated = true
+                    local _Indicies = table.clone(Indicies or {})
+                    local OldData = _Replica.OldData
+        
+                    for Index = 1, #_Indicies - 1 do
+                        OldData = OldData[_Indicies[Index]]
+                    end
+            
+                    OldData[_Indicies[#_Indicies]] = rawget(Table, Key)
+            
                     rawset(Table, Key, Value)
                 end
             end
@@ -157,12 +164,9 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
                             local T = DeepDecode(NewValue)
                             rawset(Table, Index, T)
                             return
-                        elseif type(NewValue) == "table" then
-                            rawset(Table, Index, NewValue)
-                            rawset(Method, Index, ListenToTable(_Replica, NewValue, _Indicies))
+                        else
+                            Method[Index] = NewValue
                         end
-
-                        rawset(Table, Index, NewValue)
                     end
                 end
             end
@@ -172,8 +176,21 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
             return nil, nil, nil
         end
     end)
-
     rawset(Method, "get", rawget(Method, "Get"))
+    rawset(Method, "GetValues", function()
+        local AlreadyVisited = {}
+        
+        return function()
+            for Index, Value in pairs(Table) do
+                if not table.find(AlreadyVisited, Index) then
+                    table.insert(AlreadyVisited, Index)
+                    return Index, if type(Value) == "table" then CopyDeep(Value) else Value
+                end
+            end
+            return nil, nil
+        end
+    end)
+    rawset(Method, "getValues", rawget(Method, "GetValues"))
 
 	for Index, Value in Table do
 		if type(Value) == "table" then
@@ -219,6 +236,8 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
         Config.To = "All"
     end
 
+    local Cleaner = Trove.new()
+
     local self = setmetatable({
         To = Config.To,
         Id = HttpService:GenerateGUID(false),
@@ -226,10 +245,11 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
         Tags = Config.Tags,
         __IsParent = not Config.Data,
 
-        __Cleaner = Trove.new(),
-        __Write = Signal.new(),
-        __Change = Signal.new(),
-        Destroying = Signal.new(),
+        __Write = Cleaner:Construct(Signal),
+        __Change = Cleaner:Construct(Signal),
+        Destroying = Cleaner:Construct(Signal),
+        
+        __Cleaner = Cleaner,
 
         __Parent = Config.Parent,
     }, Replica)
@@ -238,7 +258,7 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
         self[Key] = Function
     end
 
-    self.__Cleaner:Connect(self.Destroying, function() 
+    Cleaner:Connect(self.Destroying, function() 
         self.__Cleaner:Destroy()
     end)
     
@@ -258,14 +278,6 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
     local Changes = {}
 
     self.__Change:Connect(function(Path, Value)
-        local OldData = self.OldData
-        
-        for Index = 1, #Path - 1 do
-            OldData = OldData[Path[Index]]
-        end
-
-        OldData[Path[#Path]] = Value
-
         table.insert(Changes, { Time = os.clock(), Path = Path, Value = Value })
     end)
 
