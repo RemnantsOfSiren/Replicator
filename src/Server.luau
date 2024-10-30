@@ -76,6 +76,35 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
             else
                 rawset(Table, Key, Value)
             end
+
+            if (Sift.Array.is(Table) or Sift.Dictionary.count(Table) == 0) and not self.Insert then
+                rawset(self, "Insert", function(_, ...)
+                    local Args = { ... }
+                    local InsertIndices = table.clone(_Indicies)
+                    if #Args > 1 then
+                        InsertIndices[#InsertIndices + 1] = Args[1]
+                        _Replica.__Change:Fire(InsertIndices, Args[2], Table[Args[1]])
+                        table.insert(Table, Args[1], Args[2])
+                    else
+                        InsertIndices[#InsertIndices + 1] = #Table + 1
+                        _Replica.__Change:Fire(InsertIndices, Args[1], Table[#Table + 1])
+                        table.insert(Table, Args[1])
+                    end
+                end)
+                rawset(self, "insert", rawget(self, "Insert"))
+                rawset(self, "Remove", function(_, Index: number)
+                    local _Indicies = table.clone(Indicies or {})
+                    _Indicies[#_Indicies + 1] = Index
+                    _Replica.__Change:Fire(_Indicies, nil, Table[Index])
+                    table.remove(Table, Index)
+                end)
+                rawset(self, "remove", rawget(self, "Remove"))
+            elseif not Sift.Array.is(Table) and self.Insert then
+                rawset(self, "Insert", nil)
+                rawset(self, "insert", nil)
+                rawset(self, "Remove", nil)
+                rawset(self, "remove", nil)
+            end
 		end,
 	})
 
@@ -84,6 +113,30 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
 			Method[Index] = Value
 		end
 	end
+
+    if Sift.Array.is(Table) or Sift.Dictionary.count(Table) == 0 then
+        rawset(Method, "Insert", function(_, ...)
+            local Args = { ... }
+            local _Indicies = table.clone(Indicies or {})
+            if #Args > 1 then
+                _Indicies[#_Indicies + 1] = Args[1]
+                _Replica.__Change:Fire(_Indicies, Args[2], Table[Args[1]])
+                table.insert(Table, Args[1], Args[2])
+            else
+                _Indicies[#_Indicies + 1] = #Table + 1
+                _Replica.__Change:Fire(_Indicies, Args[1], Table[#Table + 1])
+                table.insert(Table, Args[1])
+            end
+        end)
+        rawset(Method, "insert", rawget(Method, "Insert"))
+        rawset(Method, "Remove", function(_, Index: number)
+            local _Indicies = table.clone(Indicies or {})
+            _Indicies[#_Indicies + 1] = Index
+            _Replica.__Change:Fire(_Indicies, nil, Table[Index])
+            table.remove(Table, Index)
+        end)
+        rawset(Method, "remove", rawget(Method, "Remove"))
+    end
 
 	return Method
 end
