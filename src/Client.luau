@@ -9,6 +9,7 @@ local Replication = require(script.Parent.Replication)
 
 local SharedFunctions = require(script.Parent.SharedFunctions)
 
+local Array = Sift.Array
 local Dictionary = Sift.Dictionary
 local CopyDeep = Dictionary.copyDeep
 
@@ -50,7 +51,6 @@ local function NewReplica(Config: {Name: string, Id: string, Tags: { any }, Data
         Tags = Config.Tags,
         Data = Config.Data,
         __IsParent = Config.IsParent,
-        OldData = if Config.Data then CopyDeep(Config.Data) else nil,
 
         __Write = Cleaner:Construct(Signal),
         __Change = Cleaner:Construct(Signal),
@@ -178,7 +178,7 @@ Replication.replicateChanges.listen(function(Data: Packet)
                 task.spawn(function()
                     local Path = Change.Path
                     local _Data = _Replica.Data
-                    local _OldData = _Replica.OldData
+                    local _OldData = CopyDeep(_Replica.Data)
  
                     if table.find(AlteredKeys, table.concat(Path, ":")) then
                         return
@@ -187,7 +187,6 @@ Replication.replicateChanges.listen(function(Data: Packet)
                     for I = 1, #Path - 1 do
                         local Key = Path[I]
                         _Data = _Data[Key]
-                        _OldData = _OldData[Key]
                         
                         if not _Data then
                             break
@@ -197,9 +196,20 @@ Replication.replicateChanges.listen(function(Data: Packet)
                     if _Data then
                         table.insert(AlteredKeys, table.concat(Path, ":"))
                         local LastKey = Path[#Path]
-                        _OldData[LastKey] = _Data[LastKey]
-                        _Data[LastKey] = Change.Value
-                        _Replica.__Change:Fire(Path, Change.Value, _OldData[LastKey])
+                        
+                        if Array.is(_Data) then
+                            if Change.Value == nil then
+                                table.remove(_Data, LastKey)
+                            elseif _Data[LastKey] then
+                                _Data[LastKey] = Change.Value
+                            else
+                                table.insert(_Data, LastKey, Change.Value)
+                            end
+                        else
+                            _Data[LastKey] = Change.Value
+                        end
+
+                        _Replica.__Change:Fire(Path, _Data[LastKey], _OldData)
                     end
                 end)
             end
