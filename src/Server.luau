@@ -66,18 +66,18 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
 			local _Indicies = table.clone(Indicies or {})
             
 			_Indicies[#_Indicies + 1] = Key
-            _Replica.__Change:Fire(_Indicies, Value, if type(Table[Key]) == "table" then CopyDeep(Table[Key]) else Table[Key])
-
-			if IsTable then
-                rawset(self, Key, ListenToTable(_Replica, Value, _Indicies))
-            end
+            _Replica.__Change:Fire(_Indicies, if IsTable then CopyDeep(Value) else Value, if type(Table[Key]) == "table" then CopyDeep(Table[Key]) else Table[Key])
 
             if Sift.Array.is(Table) and Value == nil then
-                table.remove(Table, Key)
+                warn("Use :Remove() to remove an element from an array.")
             else
                 rawset(Table, Key, Value)
             end
 
+            if IsTable then
+                rawset(self, Key, ListenToTable(_Replica, Value, _Indicies))
+            end
+            
             if (Sift.Array.is(Table) or Sift.Dictionary.count(Table) == 0) and not self.Insert then
                 rawset(self, "Insert", function(_, ...)
                     local Args = { ... }
@@ -111,27 +111,28 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
 
     rawset(Method, "get", function()
         local AlreadyVisited = {}
-
-        local _Table = ListenToTable(_Replica, Table, Indicies)
-
-        rawset(_Table, "Get", nil)
-        rawset(_Table, "get", nil)
-        rawset(_Table, "Insert", nil)
-        rawset(_Table, "insert", nil)
-        rawset(_Table, "Remove", nil)
-        rawset(_Table, "remove", nil)
+        local Cleaner = {}
 
         return function()
             for Index, Value in pairs(Table) do
                 if not table.find(AlreadyVisited, Index) then
                     table.insert(AlreadyVisited, Index)
-                    return Index, Value, function(NewValue)
-                        Method[Index] = ListenToTable(_Replica, NewValue, Indicies)
+                    local Temp = type(Value) == "table" and ListenToTable(_Replica, Table, Indicies)
+                    if Temp then
+                        table.insert(Cleaner, Temp)
+                    end
+                    return Index, Temp or Value, function(NewValue)
+                        if type(NewValue) == "table" then
+                            rawset(Method, Index, ListenToTable(_Replica, NewValue, Indicies))
+                        else
+                            rawset(Table, Index, NewValue)
+                        end
                     end
                 end
             end
 
-            table.clear(_Table)
+            table.clear(Cleaner)
+            table.clear(AlreadyVisited)
             return nil
         end
     end)
@@ -224,12 +225,14 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
             
             Changes = Array.filter(Array.sort(Changes, function(A, B)
                 return A.Time > B.Time
-            end), function(Change)
+            end), function(Change)  
                 local Id = table.concat(Change.Path, ":")
+                
                 if not Keys[Id] then
                     Keys[Id] = true
                     return true
                 end
+                
                 return false
             end)
 
