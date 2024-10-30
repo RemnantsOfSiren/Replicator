@@ -21,5 +21,4 @@ Replica:ListenToNewKey("TestArray", function(Key, Value)
 end)
 
 local Data = Replica.Data
-
 Data.TestArray:Insert(5)

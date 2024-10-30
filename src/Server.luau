@@ -108,6 +108,11 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
 		end,
 	})
 
+    rawset(Method, "get", function()
+        return Table
+    end)
+    rawset(Method, "Get", rawget(Method, "get"))
+
 	for Index, Value in Table do
 		if type(Value) == "table" then
 			Method[Index] = Value
