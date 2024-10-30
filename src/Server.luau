@@ -125,10 +125,13 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
             for Index, Value in pairs(Table) do
                 if not table.find(AlreadyVisited, Index) then
                     table.insert(AlreadyVisited, Index)
-                    return Index, Value
+                    return Index, Value, function(NewValue)
+                        Method[Index] = ListenToTable(_Replica, NewValue, Indicies)
+                    end
                 end
             end
 
+            table.clear(_Table)
             return nil
         end
     end)
