@@ -1,10 +1,10 @@
 --!strict
 local Sift = require(script.Parent.Parent.Sift) :: any
 local Trove = require(script.Parent.Parent.Trove) :: any
-local Logger = require(script.Parent.Parent.Logger) :: any
 local Signal = require(script.Parent.Parent.Signal) :: any
 
 local Types = require(script.Parent.Types)
+local Logger = require(script.Parent.Logger)
 local Replication = require(script.Parent.Replication)
 
 local SharedFunctions = require(script.Parent.SharedFunctions)

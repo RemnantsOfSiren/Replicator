@@ -67,23 +67,21 @@ return {
         local ParsedPath = Parser(Path)
 
         return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
-            --if #ParsedPath == #ChangedPath then
-                local Match = true
+            local Match = true
 
-                for Index, Key in pairs(ParsedPath) do
-                    local ChangedKey = ChangedPath[Index]
-                    if ChangedKey then
-                        if Key ~= ChangedKey then
-                            Match = false
-                            break
-                        end
+            for Index, Key in pairs(ParsedPath) do
+                local ChangedKey = ChangedPath[Index]
+                if ChangedKey then
+                    if Key ~= ChangedKey then
+                        Match = false
+                        break
                     end
                 end
+            end
 
-                if Match then
-                    task.spawn(Callback, NewValue, OldValue)
-                end
-            --end
+            if Match then
+                task.spawn(Callback, NewValue, OldValue)
+            end
         end)
     end,
 
