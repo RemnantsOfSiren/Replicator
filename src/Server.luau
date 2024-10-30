@@ -117,7 +117,9 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
             for Index, Value in pairs(Table) do
                 if not table.find(AlreadyVisited, Index) then
                     table.insert(AlreadyVisited, Index)
-                    local Temp = type(Value) == "table" and ListenToTable(_Replica, Table, Indicies)
+                    local _Indicies = table.clone(Indicies or {})
+                    _Indicies[#_Indicies + 1] = Index
+                    local Temp = type(Value) == "table" and ListenToTable(_Replica, Value, _Indicies)
                     if Temp then
                         table.insert(Cleaner, Temp)
                     end
