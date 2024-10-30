@@ -110,13 +110,27 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
 	})
 
     rawset(Method, "get", function()
-        local _Table = setmetatable(Table, Method)
+        local AlreadyVisited = {}
+
+        local _Table = ListenToTable(_Replica, Table, Indicies)
+
+        rawset(_Table, "Get", nil)
         rawset(_Table, "get", nil)
         rawset(_Table, "Insert", nil)
         rawset(_Table, "insert", nil)
         rawset(_Table, "Remove", nil)
         rawset(_Table, "remove", nil)
-        return _Table
+
+        return function()
+            for Index, Value in pairs(Table) do
+                if not table.find(AlreadyVisited, Index) then
+                    table.insert(AlreadyVisited, Index)
+                    return Index, Value
+                end
+            end
+
+            return nil
+        end
     end)
 
     rawset(Method, "Get", rawget(Method, "get"))
