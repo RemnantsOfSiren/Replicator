@@ -339,7 +339,7 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
 
     Replicas[self.Id] = self
 
-    return table.freeze(self)
+    return self
 end
 
 Replication.getInitialReplicas.listen(function(_, Player)
