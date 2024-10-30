@@ -110,8 +110,15 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
 	})
 
     rawset(Method, "get", function()
-        return Table
+        local _Table = setmetatable(Table, Method)
+        rawset(_Table, "get", nil)
+        rawset(_Table, "Insert", nil)
+        rawset(_Table, "insert", nil)
+        rawset(_Table, "Remove", nil)
+        rawset(_Table, "remove", nil)
+        return _Table
     end)
+
     rawset(Method, "Get", rawget(Method, "get"))
 
 	for Index, Value in Table do
