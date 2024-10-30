@@ -20,17 +20,29 @@ return {
 
     ListenToKeyRemoved = function(self: Types.ServerReplica | Types.ClientReplica, Path: Types.ValidPath, Callback: (...any) -> nil)
         local ParsedPath = Parser(Path)
-        local Last = ParsedPath[#ParsedPath]
 
         return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
             if NewValue then
                 return
             end
 
-            local LastKey = ChangedPath[#ChangedPath]
+            local Match = true
 
-            if Last == LastKey then
-                task.spawn(Callback, NewValue, OldValue)
+            for Index = 1, #ParsedPath do
+                local Key = ParsedPath[Index]
+                if Key then
+                    OldValue = OldValue[Key]
+
+                    if Key ~= ChangedPath[Index] then
+                        Match = false
+                        break
+                    end
+                end
+            end
+
+            if Match then
+                local Key = ChangedPath[#ChangedPath]
+                task.spawn(Callback, Key, OldValue[Key])
             end
         end)
     end,
@@ -39,6 +51,13 @@ return {
         local ParsedPath = Parser(Path)
 
         return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
+            for Index = 1, #ChangedPath do
+                local Key = ChangedPath[Index]
+                if Key then
+                    OldValue = OldValue[Key]
+                end
+            end
+
             if OldValue then
                 return
             end
@@ -66,25 +85,26 @@ return {
     ListenToChange = function(self: Types.ServerReplica | Types.ClientReplica, Path: Types.ValidPath, Callback: (...any) -> nil, SuppressOld: boolean?)
         local ParsedPath = Parser(Path)
 
-        return self.__Change:Connect(function(ChangedPath: { string | number })
+        return self.__Change:Connect(function(ChangedPath: { string | number }, _, OldData)
             local Match = true
             local Data = self.__Data or self.Data
-            local OldData = if not SuppressOld then self.OldData else nil
+            local OldData = if not SuppressOld then OldData else nil
 
-            for Index, Key in pairs(ParsedPath) do
-                local ChangedKey = ChangedPath[Index]
-                if ChangedKey then
-                    Data = Data[ChangedKey]
+            for Index = 1, #ParsedPath do
+                local Key = ParsedPath[Index]
+                if Key then
+                    Data = Data[Key]
                     if not SuppressOld then
-                        OldData = OldData[ChangedKey]
+                        OldData = OldData[Key]
                     end
 
-                    if Key ~= ChangedKey then
+                    if Key ~= ChangedPath[Index] then
                         Match = false
                         break
                     end
                 end
             end
+
 
             if Match then
                 task.spawn(Callback, Data, if SuppressOld then nil else OldData)
@@ -94,7 +114,10 @@ return {
 
     ListenToRaw = function(self: Types.ServerReplica | Types.ClientReplica, Callback: (...any) -> nil)
         return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
-            task.spawn(Callback, ChangedPath, NewValue, OldValue)
+            for Index = 1, #ChangedPath - 1 do
+                OldValue = OldValue[ChangedPath[Index]]
+            end
+            task.spawn(Callback, ChangedPath, NewValue, OldValue[ChangedPath[#ChangedPath]])
         end)
     end,
 

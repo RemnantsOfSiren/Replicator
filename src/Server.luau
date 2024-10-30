@@ -83,25 +83,13 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
             end
 
             local Updated = false
+            local OldData = CopyDeep(_Replica.__Data)
 
             if Sift.Array.is(Table) and Value == nil then
                 return warn("Use :Remove() to remove an element from an array.")
             else
                 if (IsTable and not Dictionary.equalsDeep(Value, Table[Key])) or rawget(Table, Key) ~= Value then
                     Updated = true
-                    
-                    local _Indicies = table.clone(Indicies or {})
-                    local OldData = _Replica.OldData
-        
-					for Index = 1, #_Indicies - 1 do
-                        OldData = OldData[_Indicies[Index]]
-                    end
-			
-					if OldData and #_Indicies > 0 then
-						local LastIndex = _Indicies[#_Indicies]
-						OldData[LastIndex] = rawget(Table, Key)
-					end
-            
                     rawset(Table, Key, Value)
                 end
             end
@@ -110,7 +98,7 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
 			_Indicies[#_Indicies + 1] = Key
             
             if Updated then
-                _Replica.__Change:Fire(_Indicies, if IsTable then CopyDeep(Value) else Value, if type(Table[Key]) == "table" then CopyDeep(Table[Key]) else Table[Key])
+                _Replica.__Change:Fire(_Indicies, if IsTable then CopyDeep(Value) else Value, OldData)
             end
 
             if IsTable then
@@ -120,11 +108,11 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
             if (Sift.Array.is(Table) or Sift.Dictionary.count(Table) == 0) and not self.Insert then
                 rawset(self, "Insert", function(_, ...)
                     local Args = { ... }
-                    local InsertIndices = table.clone(_Indicies or {})
+                    local InsertIndices = table.clone(Indicies or {})
                     local Index = if #Args > 1 then Args[1] else #Table + 1
                     local _Value = if #Args > 1 then Args[2] else Args[1]
                     InsertIndices[#InsertIndices + 1] = Index
-                    _Replica.__Change:Fire(InsertIndices, Args[2] or Args[1], Table[Index])
+                    _Replica.__Change:Fire(InsertIndices, Args[2] or Args[1], CopyDeep(_Replica.__Data))
                     table.insert(Table, Index, _Value)
                     if _Value and type(_Value) == "table" then
                         rawset(self, Index, ListenToTable(_Replica, _Value, InsertIndices))
@@ -132,11 +120,13 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
                 end)
                 rawset(self, "insert", rawget(self, "Insert"))
                 rawset(self, "Remove", function(_, Index: number)
-                    local _Indicies = table.clone(_Indicies or {})
+                    local _Indicies = table.clone(Indicies or {})
                     _Indicies[#_Indicies + 1] = Index
-                    _Replica.__Change:Fire(_Indicies, nil, Table[Index])
                     table.remove(Table, Index)
-                    rawset(self, Index, nil)
+                    _Replica.__Change:Fire(_Indicies, nil, CopyDeep(_Replica.__Data))
+                    if type(Table[Index]) == "table" then
+                        rawset(self, Index, nil)
+                    end
                 end)
                 rawset(self, "remove", rawget(self, "Remove"))
             elseif not Sift.Array.is(Table) and self.Insert then
@@ -166,9 +156,10 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
 
                         if IsReplicatedTable then
                             local T = DeepDecode(NewValue)
-                            rawset(Table, Index, T)
+                            rawset(Table[Index], Index, T)
                             return
                         else
+                            print("Setting", Index, NewValue)
                             Method[Index] = NewValue
                         end
                     end
@@ -213,7 +204,7 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
             local Index = if #Args > 1 then Args[1] else #Table + 1
             local _Value = if #Args > 1 then Args[2] else Args[1]
             InsertIndices[#InsertIndices + 1] = Index
-            _Replica.__Change:Fire(InsertIndices, Args[2] or Args[1], Table[Index])
+            _Replica.__Change:Fire(InsertIndices, Args[2] or Args[1], CopyDeep(_Replica.__Data))
             table.insert(Table, Index, _Value)
             if _Value and type(_Value) == "table" then
                 rawset(Method, Index, ListenToTable(_Replica, _Value, InsertIndices))
@@ -223,9 +214,11 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
         rawset(Method, "Remove", function(_, Index: number)
             local _Indicies = table.clone(Indicies or {})
             _Indicies[#_Indicies + 1] = Index
-            _Replica.__Change:Fire(_Indicies, nil, Table[Index])
             table.remove(Table, Index)
-            rawset(Method, Index, nil)
+            _Replica.__Change:Fire(_Indicies, nil, CopyDeep(_Replica.__Data))
+            if type(Table[Index]) == "table" then
+                rawset(Method, Index, nil)
+            end
         end)
         rawset(Method, "remove", rawget(Method, "Remove"))
     end
@@ -268,7 +261,6 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
     
     if Config.Data and not self.__IsParent then
         self.__Data = Config.Data
-        self.OldData = CopyDeep(Config.Data)
         self.Data = ListenToTable(self, self.__Data)
     end
     
