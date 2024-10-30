@@ -26,8 +26,6 @@ Data.TestArray:Insert(10)
 Data.TestArray:Insert(15)
 
 for Index, Value, Set in Data.TestArray:Get() do
-    print(Index, Value)
-
     if Index == 2 then
         Set({
             1,
@@ -39,4 +37,9 @@ end
 
 for Index, Value in Data.TestArray:Get() do
     print(Index, Value)
+    if type(Value) == "table" and Value.Get then
+        for Index, Value in Value:Get() do
+            print(Index, Value)
+        end
+    end
 end

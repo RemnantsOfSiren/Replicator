@@ -156,11 +156,13 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
                         if IsReplicatedTable then
                             local T = DeepDecode(NewValue)
                             rawset(Table, Index, T)
+                            return
                         elseif type(NewValue) == "table" then
-                            rawset(Method, Index, ListenToTable(_Replica, NewValue, _Indicies))
-                        else
                             rawset(Table, Index, NewValue)
+                            rawset(Method, Index, ListenToTable(_Replica, NewValue, _Indicies))
                         end
+
+                        rawset(Table, Index, NewValue)
                     end
                 end
             end
@@ -222,6 +224,7 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
         Id = HttpService:GenerateGUID(false),
         Name = Config.Name,
         Tags = Config.Tags,
+        __IsParent = not Config.Data,
 
         __Cleaner = Trove.new(),
         __Write = Signal.new(),
@@ -239,7 +242,7 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
         self.__Cleaner:Destroy()
     end)
     
-    if Config.Data then
+    if Config.Data and not self.__IsParent then
         self.__Data = Config.Data
         self.OldData = CopyDeep(Config.Data)
         self.Data = ListenToTable(self, self.__Data)
@@ -255,6 +258,14 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
     local Changes = {}
 
     self.__Change:Connect(function(Path, Value)
+        local OldData = self.OldData
+        
+        for Index = 1, #Path - 1 do
+            OldData = OldData[Path[Index]]
+        end
+
+        OldData[Path[#Path]] = Value
+
         table.insert(Changes, { Time = os.clock(), Path = Path, Value = Value })
     end)
 
@@ -297,7 +308,7 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
         Id = self.Id,
         Name = self.Name,
         Tags = self.Tags,
-        Data = Config.Data and CopyDeep(Config.Data),
+        Data = self.__Data and CopyDeep(self.__Data),
         WriteLib = self.WriteLib,
         Parent = Config.Parent and Config.Parent.Id
     }
@@ -312,20 +323,21 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
 
     Replicas[self.Id] = self
 
-    return self
+    return table.freeze(self)
 end
 
 Replication.getInitialReplicas.listen(function(_, Player)
     local _Replicas = {}
 
-    for _, _Replica in Replicas do        
+    for _, _Replica in Replicas do     
         table.insert(_Replicas, {
             Name = _Replica.Name,
             Id = _Replica.Id,
             Tags = _Replica.Tags,
-            Data = if _Replica.__Data then CopyDeep(_Replica.__Data) else nil,
+            IsParent = _Replica.__IsParent,
+            Data = if not _Replica.__IsParent then CopyDeep(_Replica.__Data) else nil,
             WriteLib = _Replica.WriteLib,
-            Parent = _Replica.__Parent and _Replica.__Parent.Id
+            Parent = if _Replica.__Parent then _Replica.__Parent.Id else nil
         })
     end
 

@@ -7,7 +7,8 @@ return ByteNet.defineNamespace("Replication", function()
         Tags = ByteNet.optional(ByteNet.array(ByteNet.unknown)),
         Data = ByteNet.optional(ByteNet.unknown),
         WriteLib = ByteNet.optional(ByteNet.inst),
-        Parent = ByteNet.optional(ByteNet.string)
+        Parent = ByteNet.optional(ByteNet.string),
+        IsParent = ByteNet.optional(ByteNet.bool),
     })
 
     return {
