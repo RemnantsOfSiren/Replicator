@@ -42,6 +42,8 @@ function Replica:Destroy()
 end
 
 local function NewReplica(Config: {Name: string, Id: string, Tags: { any }, Data: any, WriteLib: ModuleScript?, Parent: string?, IsParent: boolean?}): Types.ClientReplica
+    local Cleaner = Trove.new()
+
     local self = setmetatable({
         Id = Config.Id,
         Name = Config.Name,
@@ -50,10 +52,11 @@ local function NewReplica(Config: {Name: string, Id: string, Tags: { any }, Data
         __IsParent = Config.IsParent,
         OldData = if Config.Data then CopyDeep(Config.Data) else nil,
 
-        __Cleaner = Trove.new(),
-        __Write = Signal.new(),
-        __Change = Signal.new(),
-        Destroying = Signal.new(),
+        __Write = Cleaner:Construct(Signal),
+        __Change = Cleaner:Construct(Signal),
+        Destroying = Cleaner:Construct(Signal),
+
+        __Cleaner = Cleaner,
         
         __Parent = if Config.Parent then FindReplicaById(Config.Parent) else nil,
         WriteLib = Config.WriteLib,
@@ -194,9 +197,9 @@ Replication.replicateChanges.listen(function(Data: Packet)
                     if _Data then
                         table.insert(AlteredKeys, table.concat(Path, ":"))
                         local LastKey = Path[#Path]
-                        _Replica.__Change:Fire(Path, Value.Value, _OldData[LastKey])
                         _OldData[LastKey] = _Data[LastKey]
                         _Data[LastKey] = Change.Value
+                        _Replica.__Change:Fire(Path, Change.Value, _OldData[LastKey])
                     end
                 end)
             end

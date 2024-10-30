@@ -63,19 +63,21 @@ return {
         end)
     end,
 
-    ListenToChange = function(self: Types.ServerReplica | Types.ClientReplica, Path: Types.ValidPath, Callback: (...any) -> nil)
+    ListenToChange = function(self: Types.ServerReplica | Types.ClientReplica, Path: Types.ValidPath, Callback: (...any) -> nil, SuppressOld: boolean?)
         local ParsedPath = Parser(Path)
 
         return self.__Change:Connect(function(ChangedPath: { string | number })
             local Match = true
             local Data = self.__Data or self.Data
-            local OldData = self.OldData
+            local OldData = if not SuppressOld then self.OldData else nil
 
             for Index, Key in pairs(ParsedPath) do
                 local ChangedKey = ChangedPath[Index]
                 if ChangedKey then
                     Data = Data[ChangedKey]
-                    OldData = OldData[ChangedKey]
+                    if not SuppressOld then
+                        OldData = OldData[ChangedKey]
+                    end
 
                     if Key ~= ChangedKey then
                         Match = false
@@ -85,7 +87,7 @@ return {
             end
 
             if Match then
-                task.spawn(Callback, Data, OldData)
+                task.spawn(Callback, Data, if SuppressOld then nil else OldData)
             end
         end)
     end,
@@ -101,16 +103,15 @@ return {
 
         local _Data = self.__Data or self.Data
 
-        for Index = 1, #ParsedPath do
+        for Index = 1, #ParsedPath - 1 do
             local Key = ParsedPath[Index]
             if Key then
                 _Data = _Data[Key]
             end
         end
 
-        task.spawn(Callback, _Data[ParsedPath[#ParsedPath]])
-
-        return self:ListenToChange(Path, Callback)
+        task.spawn(Callback, _Data[ParsedPath[#ParsedPath]], nil)
+        return self:ListenToChange(Path, Callback, true)
     end,
 
     AddCleanupTask = function(self: Types.ServerReplica | Types.ClientReplica, Task: () -> nil, CleanupMethod: string | boolean?)
