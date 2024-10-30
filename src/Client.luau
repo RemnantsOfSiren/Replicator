@@ -41,13 +41,14 @@ function Replica:Destroy()
     table.clear(self)
 end
 
-local function NewReplica(Config: {Name: string, Id: string, Tags: { any }, Data: any, WriteLib: ModuleScript?, Parent: string?}): Types.ClientReplica
+local function NewReplica(Config: {Name: string, Id: string, Tags: { any }, Data: any, WriteLib: ModuleScript?, Parent: string?, IsParent: boolean?}): Types.ClientReplica
     local self = setmetatable({
         Id = Config.Id,
         Name = Config.Name,
         Tags = Config.Tags,
         Data = Config.Data,
-        OldData = CopyDeep(Config.Data),
+        __IsParent = Config.IsParent,
+        OldData = if Config.Data then CopyDeep(Config.Data) else nil,
 
         __Cleaner = Trove.new(),
         __Write = Signal.new(),
@@ -67,7 +68,7 @@ local function NewReplica(Config: {Name: string, Id: string, Tags: { any }, Data
         self.__Cleaner:Destroy()
     end)
 
-    return self
+    return table.freeze(self)
 end
 
 local Replicator = {}
@@ -105,7 +106,7 @@ local function NewReplicator(Name: string)
 
     Replicators[Name] = self
 
-    return self
+    return table.freeze(self)
 end
 
 local function Listener(Name: string, Callback: (...any) -> nil)
@@ -159,6 +160,11 @@ Replication.replicateChanges.listen(function(Data: Packet)
         local _Replica = _Replicator.__Replicas[Data.Id]
 
         if _Replica then
+            if _Replica.__IsParent then
+                warn("Parent replicas cannot be altered")
+                return
+            end
+
             table.sort(Data.Changes, function(A, B)
                 return A.Time < B.Time
             end)
@@ -166,7 +172,7 @@ Replication.replicateChanges.listen(function(Data: Packet)
             local AlteredKeys = {}
 
             for _, Change in Data.Changes do
-                --task.spawn(function()
+                task.spawn(function()
                     local Path = Change.Path
                     local _Data = _Replica.Data
                     local _OldData = _Replica.OldData
@@ -188,10 +194,11 @@ Replication.replicateChanges.listen(function(Data: Packet)
                     if _Data then
                         table.insert(AlteredKeys, table.concat(Path, ":"))
                         local LastKey = Path[#Path]
+                        _Replica.__Change:Fire(Path, Value.Value, _OldData[LastKey])
+                        _OldData[LastKey] = _Data[LastKey]
                         _Data[LastKey] = Change.Value
-                        _Replica.__Change:Fire(Path, _Data[LastKey], _OldData[LastKey])
                     end
-                --end)
+                end)
             end
         end
     end

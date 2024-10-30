@@ -1,6 +1,6 @@
 [package]
 name = "remnantsofsiren/replicator"
-version = "2.1.6-beta"
+version = "2.1.7-beta"
 registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
 
