@@ -71,7 +71,7 @@ local function NewReplica(Config: {Name: string, Id: string, Tags: { any }, Data
         self.__Cleaner:Destroy()
     end)
 
-    return table.freeze(self)
+    return self
 end
 
 local Replicator = {}
