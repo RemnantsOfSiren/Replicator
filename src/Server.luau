@@ -4,6 +4,7 @@ local HttpService = game:GetService("HttpService")
 
 local Sift = require(script.Parent.Parent.Sift) :: any
 local Trove = require(script.Parent.Parent.Trove) :: any
+local Logger = require(script.Parent.Parent.Logger) :: any
 local Signal = require(script.Parent.Parent.Signal) :: any
 
 local Types = require(script.Parent.Types)
@@ -58,7 +59,7 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
             return rawget(Table, Key)
         end,
         __tostring = function()
-            return "Replicated Table"
+            return "[[Replicated Table]]"
         end,
 		__newindex = function(self, Key, Value)
 			local IsTable = type(Value) == "table"
@@ -184,7 +185,7 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
         self.WriteLib = Config.WriteLib
         self.__WriteLib = require(self.WriteLib) :: { [string]: (self: Types.ServerReplica, ...any) -> unknown }
     elseif Config.WriteLib then
-        warn("WriteLib must be a ModuleScript and a descendant of ReplicatedStorage")
+        Logger("Error", "WriteLib must be a ModuleScript and a descendant of ReplicatedStorage.")
     end
 
     local Changes = {}
@@ -197,11 +198,9 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
         if #Changes > 0 then
             local Keys = {}
             
-            table.sort(Changes, function(A, B)
+            Changes = Array.filter(Array.sort(Changes, function(A, B)
                 return A.Time > B.Time
-            end)
-
-            Array.filter(Changes, function(Change)
+            end), function(Change)
                 local Id = table.concat(Change.Path, ":")
                 if not Keys[Id] then
                     Keys[Id] = true
