@@ -1,6 +1,7 @@
 --!strict
 local Sift = require(script.Parent.Parent.Sift) :: any
 local Trove = require(script.Parent.Parent.Trove) :: any
+local Logger = require(script.Parent.Parent.Logger) :: any
 local Signal = require(script.Parent.Parent.Signal) :: any
 
 local Types = require(script.Parent.Types)
@@ -126,7 +127,7 @@ Replication.createReplica.listen(function(_Replica)
     if not _Replicator.__Replicas[_Replica.Id] then
         task.defer(_Replicator.AddReplica, _Replicator, NewReplica(_Replica))
     else
-        warn("Replica already exists")
+        Logger("Warn", "Replica already exists")
     end
 end)
 
@@ -169,7 +170,6 @@ Replication.replicateChanges.listen(function(Data: Packet)
                     local _Data = _Replica.Data
  
                     if table.find(AlteredKeys, table.concat(Path, ":")) then
-                        print("This was already altered")
                         return
                     end
 

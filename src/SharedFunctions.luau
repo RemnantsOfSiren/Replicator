@@ -67,7 +67,7 @@ return {
         local ParsedPath = Parser(Path)
 
         return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
-            if #ParsedPath == #ChangedPath then
+            --if #ParsedPath == #ChangedPath then
                 local Match = true
 
                 for Index, Key in pairs(ParsedPath) do
@@ -83,7 +83,13 @@ return {
                 if Match then
                     task.spawn(Callback, NewValue, OldValue)
                 end
-            end
+            --end
+        end)
+    end,
+
+    ListenToRaw = function(self: Types.ServerReplica | Types.ClientReplica, Callback: (...any) -> nil)
+        return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
+            task.spawn(Callback, ChangedPath, NewValue, OldValue)
         end)
     end,
 
