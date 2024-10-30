@@ -159,7 +159,6 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
                             rawset(Table[Index], Index, T)
                             return
                         else
-                            print("Setting", Index, NewValue)
                             Method[Index] = NewValue
                         end
                     end
