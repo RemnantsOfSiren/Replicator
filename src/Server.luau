@@ -89,14 +89,18 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
             else
                 if (IsTable and not Dictionary.equalsDeep(Value, Table[Key])) or rawget(Table, Key) ~= Value then
                     Updated = true
+                    
                     local _Indicies = table.clone(Indicies or {})
                     local OldData = _Replica.OldData
         
-                    for Index = 1, #_Indicies - 1 do
+					for Index = 1, #_Indicies - 1 do
                         OldData = OldData[_Indicies[Index]]
                     end
-            
-                    OldData[_Indicies[#_Indicies]] = rawget(Table, Key)
+			
+					if OldData and #_Indicies > 0 then
+						local LastIndex = _Indicies[#_Indicies]
+						OldData[LastIndex] = rawget(Table, Key)
+					end
             
                     rawset(Table, Key, Value)
                 end
