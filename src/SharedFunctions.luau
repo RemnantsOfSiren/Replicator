@@ -66,12 +66,17 @@ return {
     ListenToChange = function(self: Types.ServerReplica | Types.ClientReplica, Path: Types.ValidPath, Callback: (...any) -> nil)
         local ParsedPath = Parser(Path)
 
-        return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
+        return self.__Change:Connect(function(ChangedPath: { string | number })
             local Match = true
+            local Data = self.__Data or self.Data
+            local OldData = self.OldData
 
             for Index, Key in pairs(ParsedPath) do
                 local ChangedKey = ChangedPath[Index]
                 if ChangedKey then
+                    Data = Data[ChangedKey]
+                    OldData = OldData[ChangedKey]
+
                     if Key ~= ChangedKey then
                         Match = false
                         break
@@ -80,7 +85,7 @@ return {
             end
 
             if Match then
-                task.spawn(Callback, NewValue, OldValue)
+                task.spawn(Callback, Data, OldData)
             end
         end)
     end,

@@ -9,6 +9,7 @@ export type Replica = {
     Name: string,
     Tags: { any },
     Data: { [string | number]: any }?,
+    OldData: { [string | number]: any }?,
     
     WriteLib: ModuleScript?,
     __WriteLib: { [any]: any }?,

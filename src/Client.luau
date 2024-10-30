@@ -47,6 +47,7 @@ local function NewReplica(Config: {Name: string, Id: string, Tags: { any }, Data
         Name = Config.Name,
         Tags = Config.Tags,
         Data = Config.Data,
+        OldData = CopyDeep(Config.Data),
 
         __Cleaner = Trove.new(),
         __Write = Signal.new(),
@@ -165,9 +166,10 @@ Replication.replicateChanges.listen(function(Data: Packet)
             local AlteredKeys = {}
 
             for _, Change in Data.Changes do
-                task.spawn(function()
+                --task.spawn(function()
                     local Path = Change.Path
                     local _Data = _Replica.Data
+                    local _OldData = _Replica.OldData
  
                     if table.find(AlteredKeys, table.concat(Path, ":")) then
                         return
@@ -176,6 +178,7 @@ Replication.replicateChanges.listen(function(Data: Packet)
                     for I = 1, #Path - 1 do
                         local Key = Path[I]
                         _Data = _Data[Key]
+                        _OldData = _OldData[Key]
                         
                         if not _Data then
                             break
@@ -185,11 +188,10 @@ Replication.replicateChanges.listen(function(Data: Packet)
                     if _Data then
                         table.insert(AlteredKeys, table.concat(Path, ":"))
                         local LastKey = Path[#Path]
-                        local OldData = if typeof(_Data[LastKey]) == "table" then CopyDeep(_Data[LastKey]) else _Data[LastKey]
                         _Data[LastKey] = Change.Value
-                        _Replica.__Change:Fire(Path, Change.Value, OldData)
+                        _Replica.__Change:Fire(Path, _Data[LastKey], _OldData[LastKey])
                     end
-                end)
+                --end)
             end
         end
     end
