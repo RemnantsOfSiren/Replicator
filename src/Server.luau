@@ -254,6 +254,8 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
         self[Key] = Function
     end
 
+    self.__Ready = false
+
     Cleaner:Connect(self.Destroying, function() 
         self.__Cleaner:Destroy()
     end)
@@ -276,40 +278,44 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
         table.insert(Changes, { Time = os.clock(), Path = Path, Value = Value })
     end)
 
-    self.__Cleaner:Connect(RunService.Heartbeat, function() 
-        if #Changes > 0 then
-            local Keys = {}
-            
-            Changes = Array.filter(Array.sort(Changes, function(A, B)
-                return A.Time > B.Time
-            end), function(Change)  
-                local Id = table.concat(Change.Path, ":")
+    self.__Cleaner:Add(task.delay(.1, function()
+        while true do
+            if #Changes > 0 and self.__Ready then
+                local Keys = {}
                 
-                if not Keys[Id] then
-                    Keys[Id] = true
-                    return true
+                Changes = Array.filter(Array.sort(Changes, function(A, B)
+                    return A.Time > B.Time
+                end), function(Change)  
+                    local Id = table.concat(Change.Path, ":")
+                    
+                    if not Keys[Id] then
+                        Keys[Id] = true
+                        return true
+                    end
+                    
+                    return false
+                end)
+
+                local Packet: Types.Packet = {
+                    Name = self.Name,
+                    Id = self.Id,
+                    Changes = Changes
+                }
+
+                if self.To == "All" or not self.To then
+                    Replication.replicateChanges.sendToAll(Packet)
+                elseif typeof(self.To) == "table" then
+                    Replication.replicateChanges.sendToList(Packet, self.To)
+                else
+                    Replication.replicateChanges.sendTo(Packet, self.To)
                 end
-                
-                return false
-            end)
 
-            local Packet: Types.Packet = {
-                Name = self.Name,
-                Id = self.Id,
-                Changes = Changes
-            }
-
-            if self.To == "All" or not self.To then
-                Replication.replicateChanges.sendToAll(Packet)
-            elseif typeof(self.To) == "table" then
-                Replication.replicateChanges.sendToList(Packet, self.To)
-            else
-                Replication.replicateChanges.sendTo(Packet, self.To)
+                table.clear(Changes)
             end
 
-            table.clear(Changes)
+            task.wait()
         end
-    end)
+    end), true)
 
     local CreatePacket = {
         Id = self.Id,
@@ -327,6 +333,8 @@ local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, Wr
     else
         task.spawn(Replication.createReplica.sendTo, CreatePacket, Config.To)
     end
+    
+    self.__Ready = true
 
     Replicas[self.Id] = self
 
