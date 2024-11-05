@@ -1,5 +1,4 @@
 --!strict
-local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 
 local Sift = require(script.Parent.Parent.Sift) :: any
@@ -88,7 +87,7 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
             if Sift.Array.is(Table) and Value == nil then
                 return warn("Use :Remove() to remove an element from an array.")
             else
-                if (IsTable and not Dictionary.equalsDeep(Value, Table[Key])) or rawget(Table, Key) ~= Value then
+                if (IsTable and type(rawget(Table, Key)) == "table" and not Dictionary.equalsDeep(Value, Table[Key])) or rawget(Table, Key) ~= Value then
                     Updated = true
                     rawset(Table, Key, Value)
                 end
@@ -136,55 +135,44 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
                 rawset(self, "remove", nil)
             end
 		end,
-	})
-
-    rawset(Method, "Get", function()
-        local AlreadyVisited = {}
-        local Cleaner = {}
-
-        return function()
-            for Index, Value in pairs(Table) do
-                if not table.find(AlreadyVisited, Index) then
-                    table.insert(AlreadyVisited, Index)
-
-                    local _Indicies = table.clone(Indicies or {})
-                    _Indicies[#_Indicies + 1] = Index
-                    Value = if type(Value) == "table" then ListenToTable(_Replica, Value, _Indicies) else Value
-                    
-                    return Index, Value, function(NewValue)
-                        local IsReplicatedTable = type(NewValue) == "table" and NewValue.__type and NewValue.__type == "Replicated Table"
-
-                        if IsReplicatedTable then
-                            local T = DeepDecode(NewValue)
-                            rawset(Table[Index], Index, T)
-                            return
-                        else
-                            Method[Index] = NewValue
+        __iter = function(self)
+            local AlreadyVisited = {}
+            local Cleaner = {}
+    
+            return function()
+                for Index, Value in pairs(Table) do
+                    if not table.find(AlreadyVisited, Index) then
+                        table.insert(AlreadyVisited, Index)
+    
+                        local _Indicies = table.clone(Indicies or {})
+                        _Indicies[#_Indicies + 1] = Index
+                        Value = if type(Value) == "table" then ListenToTable(_Replica, Value, _Indicies) else Value
+                        
+                        return Index, Value, function(NewValue)
+                            local IsReplicatedTable = type(NewValue) == "table" and NewValue.__type and NewValue.__type == "Replicated Table"
+    
+                            if IsReplicatedTable then
+                                local T = DeepDecode(NewValue)
+                                rawset(Table[Index], Index, T)
+                                return
+                            else
+                                self[Index] = NewValue
+                            end
                         end
                     end
                 end
+    
+                table.clear(Cleaner)
+                table.clear(AlreadyVisited)
+                return nil, nil, nil
             end
+        end,
+	})
 
-            table.clear(Cleaner)
-            table.clear(AlreadyVisited)
-            return nil, nil, nil
-        end
+    rawset(Method, "Get", function()
+        return CopyDeep(Table)
     end)
     rawset(Method, "get", rawget(Method, "Get"))
-    rawset(Method, "GetValues", function()
-        local AlreadyVisited = {}
-        
-        return function()
-            for Index, Value in pairs(Table) do
-                if not table.find(AlreadyVisited, Index) then
-                    table.insert(AlreadyVisited, Index)
-                    return Index, if type(Value) == "table" then CopyDeep(Value) else Value
-                end
-            end
-            return nil, nil
-        end
-    end)
-    rawset(Method, "getValues", rawget(Method, "GetValues"))
 
 	for Index, Value in Table do
 		if type(Value) == "table" then
