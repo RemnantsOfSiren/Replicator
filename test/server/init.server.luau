@@ -28,11 +28,7 @@ Data.TestArray:Insert(15)
 
 task.wait(4)
 
-for Index, _, Set in Data.TestArray:Get() do
-    -- Replica:ListenToChange({"TestArray", Index }, function(Value)
-    --     print("Updating", Index, Value)
-    -- end)
-
+for Index, _, Set in Data.TestArray do
     if Index == 2 then
         Set({
             1,
@@ -42,7 +38,7 @@ for Index, _, Set in Data.TestArray:Get() do
     end
 end
 
-for Index, Value in Data.TestArray:GetValues() do
+for Index, Value in Data.TestArray:Get() do
     print(Index, Value)
 end
 
@@ -52,6 +48,6 @@ Replica.Data.TestArray:Remove(1)
 
 print("After Removal")
 
-for Index, Value in Replica.Data.TestArray:GetValues() do
+for Index, Value in Replica.Data.TestArray:Get() do
     print(Index, Value)
 end
