@@ -22,7 +22,7 @@ type Path = { Data }
 --[=[
     @method ListenToKeyRemoved
     @within Replica
-    @param Path string
+    @param Path { string | number } | string
     @param Callback (...any) -> nil
     @return RBXScriptConnection
 
@@ -32,7 +32,7 @@ type Path = { Data }
 --[=[
     @method ListenToNewKey
     @within Replica
-    @param Path string
+    @param Path { string | number } | string
     @param Callback (...any) -> nil
     @return RBXScriptConnection
 
@@ -42,7 +42,7 @@ type Path = { Data }
 --[=[
     @method ListenToChange
     @within Replica
-    @param Path string
+    @param Path { string | number } | string
     @param Callback (...any) -> nil
     @param SuppressOld boolean?
     @return RBXScriptConnection
@@ -62,7 +62,7 @@ type Path = { Data }
 --[=[
     @method ObserveChange
     @within Replica
-    @param Path string
+    @param Path { string | number } | string
     @param Callback (...any) -> nil
     @return RBXScriptConnection
 
