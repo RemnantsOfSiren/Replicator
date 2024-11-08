@@ -33,6 +33,16 @@ local Replicas = {}
 local Replica = {}
 Replica.__index = Replica
 
+--[=[
+    @method Write
+    @within Replica
+    @server
+    @param Method string
+    @param ... any
+    @return any
+
+    Uses the WriteLib to write data changes, and then replicates the write call to the client along with any information needed to replicate the call.
+]=]
 function Replica:Write(Method: string, ...: any)
     if self.__WriteLib and self.__WriteLib[Method] then
         local Return = { self.__WriteLib[Method](self, ...) }
@@ -50,6 +60,16 @@ function Replica:Write(Method: string, ...: any)
     end
 end
 
+--[=[
+    @method Destroy
+    @within Replica
+    @server
+    @return nil
+
+    Destroys the replica and cleans up any tasks that were added to the cleaner.
+    [Destroying] will be fired when the replica is destroyed.
+    This should only ever be intentionally called from the Server.
+]=]
 function Replica:Destroy()
     self.Destroying:Fire()
     task.defer(self.__Cleaner.Destroy, self.__Cleaner)
@@ -64,6 +84,97 @@ function Replica:Destroy()
     table.clear(self)
 end
 
+--[=[ 
+    @class ReplicatedTable
+    @server
+
+    Mutating this table will cause the changes to be replicated to the client.
+    -- Iterating over the table will return the index, value, and a function to set the value.
+    ```lua
+    local Replica = Replicator.NewReplica({
+        Name = "Replica",
+        Tags = { "Test" },
+        Data = {
+            Array = { 1, 2, 3 },
+        }
+    })
+    
+    local Array = Replica.Data.Array
+    
+    for Index, Value, SetValue in Array do
+        print(Index, Value)
+        SetValue(10)
+    end
+    ```
+]=]
+
+--[=[
+    @method Insert
+    @within ReplicatedTable
+    @param Index number?
+    @param Value any
+    @return nil
+
+    - If the table is an array, inserts a value into the array at the specified index or at the end of the array.
+    - If the table is a dictionary, this function call will not exist and may throw an error.
+
+    ```lua
+    local Replica = Replicator.NewReplica({
+        Name = "Replica",
+        Tags = { "Test" },
+        Data = {
+            Array = { 1, 2, 3 },
+        }
+    })
+    
+    local Array = Replica.Data.Array
+    
+    Array:Insert(2, 10)
+    Array:Insert(15)
+
+    for Index, Value in Array:Get() do
+        print(Value)
+    end
+    ---> 1, 10, 2, 3, 15
+    ```
+]=]
+
+--[=[
+    @method Remove
+    @within ReplicatedTable
+    @param Index number
+    @return nil
+
+    - If the table is an array, removes the value at the specified index.
+    - If the table is a dictionary, this function call will not exist and may throw an error.
+
+    ```lua
+    local Replica = Replicator.NewReplica({
+        Name = "Replica",
+        Tags = { "Test" },
+        Data = {
+            Array = { 1, 2, 3 },
+        }
+    })
+    
+    local Array = Replica.Data.Array
+    
+    Array:Remove(2)
+
+    for Index, Value in Array:Get() do
+        print(Value)
+    end
+    ---> 1, 3
+    ```
+]=]
+
+--[=[
+    @method Get
+    @within ReplicatedTable
+    @return any
+
+    Returns a deep copy of the table.
+]=]
 local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[number]: any}?)
 	local Method = setmetatable({
         __type = "Replicated Table",
@@ -213,7 +324,7 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
 	return Method
 end
 
-local function NewReplica(Config: {Name: string, Tags: { string }, Data: any, WriteLib: ModuleScript?, To: Types.ToOptions?, Parent: Types.ServerReplica?}): Types.ServerReplica
+local function NewReplica(Config: {Name: string, Tags: { string }, Data: { [any]: any }, WriteLib: ModuleScript?, To: Types.ToOptions?, Parent: Types.ServerReplica?}): Types.ServerReplica
     if Config.Parent and Config.Parent.To then
         Config.To = Config.Parent.To
     elseif not Config.To then
@@ -347,6 +458,13 @@ Replication.getInitialReplicas.listen(function(_, Player)
     Replication.getInitialReplicas.sendTo(_Replicas, Player)
 end)
 
+--[=[
+    @function NewReplica
+    @within Replicator
+    @server
+    @param Config {Name: string, Tags: { string }?, Data: {[any]: any}?, WriteLib: ModuleScript?, To: Types.ToOptions?, Parent: Replica]?}
+    @return Replica
+]=]
 return table.freeze({
     NewReplica = NewReplica
 })

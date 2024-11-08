@@ -9,6 +9,76 @@ type Data = {
 
 type Path = { Data }
 
+--[=[
+    @method ListenToWrite
+    @within Replica
+    @param Method string
+    @param Callback (...any) -> nil
+    @return RBXScriptConnection
+
+    Connects to the Write event and listens for a specific method to be called. When the method is called, the callback is fired with the arguments passed to the method.
+]=]
+
+--[=[
+    @method ListenToKeyRemoved
+    @within Replica
+    @param Path string
+    @param Callback (...any) -> nil
+    @return RBXScriptConnection
+
+    Connects to the Change event and listens for a specific key to be removed. When the key is removed, the callback is fired with the key and the value of the key before it was removed.
+]=]
+
+--[=[
+    @method ListenToNewKey
+    @within Replica
+    @param Path string
+    @param Callback (...any) -> nil
+    @return RBXScriptConnection
+
+    Connects to the Change event and listens for a new key to be added. When the key is added, the callback is fired with the key and the value of the key.
+]=]
+
+--[=[
+    @method ListenToChange
+    @within Replica
+    @param Path string
+    @param Callback (...any) -> nil
+    @param SuppressOld boolean?
+    @return RBXScriptConnection
+
+    Connects to the Change event and listens for a specific key to be changed. When the key is changed, the callback is fired with the new value and the old value.
+]=]
+
+--[=[
+    @method ListenToRaw
+    @within Replica
+    @param Callback (...any) -> nil
+    @return RBXScriptConnection
+
+    Connects to the Change event and listens for any key to be changed. When a key is changed, the callback is fired with the path, the new value, and the old value.
+]=]
+
+--[=[
+    @method ObserveChange
+    @within Replica
+    @param Path string
+    @param Callback (...any) -> nil
+    @return RBXScriptConnection
+
+    Observes a specific key and fires the callback with the value of the key. The callback is fired immediately and then whenever the key is changed.
+]=]
+
+--[=[
+    @method AddCleanupTask
+    @within Replica
+    @param Task () -> nil
+    @param CleanupMethod string | boolean?
+    @return nil
+
+    Adds a task to be cleaned when the replica is destroyed. If a method is provided it'll use this method to clean, otherwise it'll assume that it is a function or thread (true).
+]=]
+
 return {
     ListenToWrite = function(self: Types.ServerReplica | Types.ClientReplica, Method: string, Callback: (...any) -> nil)
         return self.__Write:Connect(function(_Method: string, Args: { any })

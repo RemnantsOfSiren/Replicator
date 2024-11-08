@@ -109,7 +109,7 @@ local function NewReplicator(Name: string)
 
     Replicators[Name] = self
 
-    return table.freeze(self)
+    return self
 end
 
 local function Listener(Name: string, Callback: (...any) -> nil)
@@ -233,6 +233,17 @@ end)
 
 Replication.getInitialReplicas.send()
 
+--[=[
+    @function ListenToNewReplica
+    @within Replicator
+    @client
+    @param Name string
+    @param Callback (Replica: Replica) -> nil
+    @return () -> nil
+
+    Listens to new replicas being created, and fires the callback with the new replica.
+    returns a function that when called, disconnects the listener.
+]=]
 return table.freeze({
     ListenToNewReplica = Listener,
 })
