@@ -18,8 +18,8 @@ version = "0.4.6"
 dependencies = []
 
 [[package]]
-name = "remnantsofsiren/replicator"
-version = "2.0.0"
+name = "remnantsofsiren/replicator2"
+version = "1.0.0"
 dependencies = [["ByteNet", "ffrostflame/bytenet@0.4.6"], ["Sift", "csqrl/sift@0.0.9"], ["Signal", "data-oriented-house/lemonsignal@1.10.0"], ["Trove", "sleitnick/trove@1.4.0"]]
 
 [[package]]
