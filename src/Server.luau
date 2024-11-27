@@ -17,7 +17,7 @@ local CopyDeep = Dictionary.copyDeep
 local function DeepDecode(Data: any)
     local T = {}
 
-    for Key, Value in Data:Get() do
+    for Key, Value in Data do
         if typeof(Value) == "table" then
             T[Key] = DeepDecode(Value)
         else
