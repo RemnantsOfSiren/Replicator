@@ -11,7 +11,7 @@ local Replica = Replicator.NewReplica({
     Name = "Test",
     Tags = { "Test" },
     Data = {
-        TestArray = {},
+        TestArray = {1, 2, 3},
     },
     Parent = Parent,
 })
@@ -22,9 +22,13 @@ Replica:ListenToNewKey("TestArray", function(Index, Value)
     print(Index, Value)
 end)
 
-Data.TestArray:Insert(5)
+Data.TestArray:Insert(2, 5)
 Data.TestArray:Insert(10)
 Data.TestArray:Insert(15)
+
+for Index, Value in Data.TestArray:Get() do
+    print(Index, Value)
+end
 
 task.wait(4)
 
