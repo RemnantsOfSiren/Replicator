@@ -6,5 +6,5 @@ Installation method
 #wally.toml
 
 [dependencies]
-replicator = "remnantsofsiren/replicator2@1.0.0^"
+replicator = "remnantsofsiren/replicator2@^1.0.0"
 ```
