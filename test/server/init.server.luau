@@ -7,51 +7,25 @@ local Parent = Replicator.NewReplica({
     To = "All",
 })
 
-local Replica = Replicator.NewReplica({
-    Name = "Test",
-    Tags = { "Test" },
-    Data = {
-        TestArray = {1, 2, 3},
-    },
-    Parent = Parent,
-})
+local Replicas = {}
 
-local Data = Replica.Data
-
-Replica:ListenToNewKey("TestArray", function(Index, Value)
-    print(Index, Value)
-end)
-
-Data.TestArray:Insert(2, 5)
-Data.TestArray:Insert(10)
-Data.TestArray:Insert(15)
-
-for Index, Value in Data.TestArray:Get() do
-    print(Index, Value)
+for I = 1, 20 do 
+    table.insert(Replicas, Replicator.NewReplica({
+        Name = `Test_{I}`,
+        Tags = { "Test" },
+        Data = {
+            TestArray = {1, 2, 3},
+        },
+        Parent = Parent,
+    }))
 end
 
-task.wait(4)
+for _, Replica in ipairs(Replicas) do
+    Replica:ListenToChange("TestArray", function()
+        print("Replica has changed!")
+    end)
 
-for Index, _, Set in Data.TestArray do
-    if Index == 2 then
-        Set({
-            1,
-            2,
-            3
-        })
-    end
-end
-
-for Index, Value in Data.TestArray:Get() do
-    print(Index, Value)
-end
-
-print("Before Removal")
-
-Replica.Data.TestArray:Remove(1)
-
-print("After Removal")
-
-for Index, Value in Replica.Data.TestArray:Get() do
-    print(Index, Value)
+    task.delay(10, function() 
+        Replica.Data.TestArray:Insert(10)
+    end)
 end

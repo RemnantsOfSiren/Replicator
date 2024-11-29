@@ -2,14 +2,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Replicator = require(ReplicatedStorage.Packages.Replicator) :: { any }
 
-Replicator.ListenToNewReplica("Test", function(Replica)
-    Replica:ObserveChange("TestArray", function(Value)
-        print("Table Changed:", Value)
+for i = 1, 20 do
+    task.spawn(function()
+        Replicator.ListenToNewReplica(`Test_{i}`, function(Replica)
+            Replica:ListenToChange("TestArray", function()
+                print("Replica has changed!")
+            end)
+        end)
     end)
-    Replica:ListenToNewKey({"TestArray"}, function(Key, Value)
-        print("New Key:", Key, "Value:", Value)
-    end)
-    Replica:ListenToKeyRemoved({"TestArray"}, function(Key, Value)
-        print("Key Removed:", Key, "Value:", Value)
-    end)
-end)
+end

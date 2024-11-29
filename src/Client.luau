@@ -18,6 +18,10 @@ local Replicators = {}
 local function FindReplicaById(Id: string?): Types.ClientReplica?
     if Id then
         for _, _Replicator in pairs(Replicators) do
+            if not _Replicator.IsParent then
+               continue
+            end
+
             for _, _Replica in pairs(_Replicator.__Replicas) do
                 if _Replica.Id == Id then
                     return _Replica
@@ -45,6 +49,15 @@ end
 local function NewReplica(Config: {Name: string, Id: string, Tags: { any }, Data: any, WriteLib: ModuleScript?, Parent: string?, IsParent: boolean?}): Types.ClientReplica
     local Cleaner = Trove.new()
 
+    local Parent
+
+    if Config.Parent then
+        repeat
+            Parent = FindReplicaById(Config.Parent)
+            task.wait()
+        until Parent
+    end
+
     local self = setmetatable({
         Id = Config.Id,
         Name = Config.Name,
@@ -58,7 +71,7 @@ local function NewReplica(Config: {Name: string, Id: string, Tags: { any }, Data
 
         __Cleaner = Cleaner,
         
-        __Parent = if Config.Parent then FindReplicaById(Config.Parent) else nil,
+        __Parent = Parent,
         WriteLib = Config.WriteLib,
         __WriteLib = Config.WriteLib and require(Config.WriteLib) :: {[any]: any} or nil,
     }, Replica)
@@ -85,7 +98,12 @@ function Replicator:AddListener(Callback)
     end
 
     return function()
-        table.remove(self.__Listeners, table.find(self.__Listeners, Callback))
+        for I = #self.__Listeners, 1, -1 do
+            if self.__Listeners[I] == Callback then
+                table.remove(self.__Listeners, I)
+            end
+        end
+        table.sort(self.__Listeners)
     end
 end
 
@@ -96,13 +114,14 @@ function Replicator:AddReplica(_Replica)
     end
 end
 
-local function NewReplicator(Name: string)
+local function NewReplicator(Name: string, IsParent: boolean)
     if Replicators[Name] then
         return Replicators[Name]
     end
 
     local self = setmetatable({
         Name = Name,
+        IsParent = IsParent,
         __Replicas = {},
         __Listeners = {},
     }, Replicator)
@@ -112,25 +131,15 @@ local function NewReplicator(Name: string)
     return self
 end
 
-local function Listener(Name: string, Callback: (...any) -> nil)
-    local _Replicator = Replicators[Name]
-
-    if not _Replicator then
-        _Replicator = NewReplicator(Name)
-    end
-
-    return _Replicator:AddListener(Callback)
-end
-
 Replication.createReplica.listen(function(_Replica)
     local _Replicator = Replicators[_Replica.Name]
 
     if not _Replicator then
-        _Replicator = NewReplicator(_Replica.Name)
+        _Replicator = NewReplicator(_Replica.Name, _Replica.IsParent)
     end
 
     if not _Replicator.__Replicas[_Replica.Id] then
-        task.defer(_Replicator.AddReplica, _Replicator, NewReplica(_Replica))
+        task.spawn(_Replicator.AddReplica, _Replicator, NewReplica(_Replica))
     else
         Logger("Warn", "Replica already exists")
     end
@@ -218,16 +227,20 @@ Replication.replicateChanges.listen(function(Data: Packet)
 end)
 
 Replication.getInitialReplicas.listen(function(_Replicas) 
-    for _, _Replica in _Replicas do
-        local TempReplica = NewReplica(_Replica)
+    table.sort(_Replicas, function(A, B)
+        return A.IsParent and not B.IsParent
+    end)
+    
+    print(_Replicas)
 
-        local _Replicator = Replicators[TempReplica.Name]
+    for _, _Replica in _Replicas do
+        local _Replicator = Replicators[_Replica.Name]
         
         if not _Replicator then
-            _Replicator = NewReplicator(TempReplica.Name)
+            _Replicator = NewReplicator(_Replica.Name, _Replica.IsParent)
         end
 
-        task.defer(_Replicator.AddReplica, _Replicator, TempReplica)
+        task.defer(_Replicator.AddReplica, _Replicator, NewReplica(_Replica))
     end
 end)
 
@@ -245,5 +258,23 @@ Replication.getInitialReplicas.send()
     returns a function that when called, disconnects the listener.
 ]=]
 return table.freeze({
-    ListenToNewReplica = Listener,
+    ListenToNewReplica = function(Name: string, Callback: (...any) -> nil)
+        local _Replicator = Replicators[Name]
+        local Thread = coroutine.running()
+
+        if not _Replicator then
+            task.spawn(function()
+                repeat
+                    _Replicator = Replicators[Name]
+                    task.wait()
+                until _Replicator
+                coroutine.resume(Thread)
+            end)
+            print("Waiting for replicator", Name)
+            coroutine.yield()
+            print("Replicator found", Name)
+        end
+
+        return _Replicator:AddListener(Callback)    
+    end,
 })
