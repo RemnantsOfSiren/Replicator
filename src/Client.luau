@@ -259,22 +259,27 @@ Replication.getInitialReplicas.send()
 ]=]
 return table.freeze({
     ListenToNewReplica = function(Name: string, Callback: (...any) -> nil)
-        local _Replicator = Replicators[Name]
-        local Thread = coroutine.running()
+        local Listener
 
-        if not _Replicator then
-            task.spawn(function()
+        local Disconnector = function()
+            if Listener then
+                Listener()
+            end
+        end
+
+        task.spawn(function()
+            local _Replicator = Replicators[Name]
+
+            if not _Replicator then
                 repeat
                     _Replicator = Replicators[Name]
                     task.wait()
                 until _Replicator
-                coroutine.resume(Thread)
-            end)
-            print("Waiting for replicator", Name)
-            coroutine.yield()
-            print("Replicator found", Name)
-        end
+            end
 
-        return _Replicator:AddListener(Callback)    
+            Listener = _Replicator:AddListener(Callback)
+        end)
+
+        return Disconnector   
     end,
 })
