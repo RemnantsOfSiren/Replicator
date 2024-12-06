@@ -230,8 +230,6 @@ Replication.getInitialReplicas.listen(function(_Replicas)
     table.sort(_Replicas, function(A, B)
         return A.IsParent and not B.IsParent
     end)
-    
-    print(_Replicas)
 
     for _, _Replica in _Replicas do
         local _Replicator = Replicators[_Replica.Name]
