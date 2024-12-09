@@ -14,19 +14,6 @@ local Array = Sift.Array
 local Dictionary = Sift.Dictionary
 local CopyDeep = Dictionary.copyDeep
 
-local function DeepDecode(Data: any)
-    local T = {}
-
-    for Key, Value in Data do
-        if typeof(Value) == "table" then
-            T[Key] = DeepDecode(Value)
-        else
-            T[Key] = Value
-        end
-    end
-
-    return T
-end
 
 local Replicas = {}
 
@@ -175,21 +162,37 @@ end
 
     Returns a deep copy of the table.
 ]=]
+
+local ValidKeyTypes = { "string", "number" }
+
 local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[number]: any}?)
 	local Method = setmetatable({
         __type = "Replicated Table",
+        __value = {},
     }, {
-		__index = function(_, Key) 
-            return rawget(Table, Key)
+		__index = function(self, Key)
+            return rawget(self.__value, Key)
         end,
         __tostring = function()
             return "[[Replicated Table]]"
         end,
 		__newindex = function(self, Key, Value)
+            local validKey = table.find(ValidKeyTypes, typeof(Key))
+            
+            if not validKey then
+                warn(`Attempt to assign a value to a key that is not a string or number. {type(Key)} was given.`)
+                return
+            end
+
 			local IsTable = type(Value) == "table"
+
             if IsTable and Value.__type == "Replicated Table" then
                 warn("Attempt to assign a replicated table to another replicated table.")
                 return
+            end
+
+            if IsTable and #Value == 0 then
+                warn(`Attempt to assign the value of {Key} to an empty array.`)
             end
 
             local Updated = false
@@ -198,7 +201,8 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
             if Sift.Array.is(Table) and Value == nil then
                 return warn("Use :Remove() to remove an element from an array.")
             else
-                if (IsTable and type(rawget(Table, Key)) == "table" and not Dictionary.equalsDeep(Value, Table[Key])) or rawget(Table, Key) ~= Value then
+                local TValue = rawget(Table, Key) 
+                if (IsTable and type(TValue) == "table" and not Dictionary.equalsDeep(Value, TValue)) or TValue ~= Value then
                     Updated = true
                     rawset(Table, Key, Value)
                 end
@@ -212,10 +216,10 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
             end
 
             if IsTable then
-                rawset(self, Key, ListenToTable(_Replica, Value, _Indicies))
+                rawset(self.__value, Key, ListenToTable(_Replica, Value, _Indicies))
             end
             
-            if (Sift.Array.is(Table) or Sift.Dictionary.count(Table) == 0) and not self.Insert then
+            if (Sift.Array.is(Table) or Sift.Dictionary.count(Table) == 0) and not rawget(self, "Insert") then
                 rawset(self, "Insert", function(_, ...)
                     local Args = { ... }
                     local InsertIndices = table.clone(Indicies or {})
@@ -239,7 +243,7 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
                     end
                 end)
                 rawset(self, "remove", rawget(self, "Remove"))
-            elseif not Sift.Array.is(Table) and self.Insert then
+            elseif not Sift.Array.is(Table) and rawget(self, "Insert") then
                 rawset(self, "Insert", nil)
                 rawset(self, "insert", nil)
                 rawset(self, "Remove", nil)
@@ -263,7 +267,7 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
                             local IsReplicatedTable = type(NewValue) == "table" and NewValue.__type and NewValue.__type == "Replicated Table"
     
                             if IsReplicatedTable then
-                                local T = DeepDecode(NewValue)
+                                local T = CopyDeep(NewValue)
                                 rawset(Table[Index], Index, T)
                                 return
                             else
