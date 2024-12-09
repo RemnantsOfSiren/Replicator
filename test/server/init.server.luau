@@ -28,4 +28,10 @@ for _, Replica in ipairs(Replicas) do
     task.delay(10, function() 
         Replica.Data.TestArray:Insert(10)
     end)
+
+    task.delay(15, function()
+        print(Replica.Data.TestArray)
+        Replica.Data.TestArray = {}
+        print(Replica.Data.TestArray)
+    end)
 end
