@@ -171,7 +171,7 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: {[n
         __value = {},
     }, {
 		__index = function(self, Key)
-            return rawget(self.__value, Key)
+            return rawget(self.__value, Key) or rawget(Table, Key)
         end,
         __tostring = function()
             return "[[Replicated Table]]"

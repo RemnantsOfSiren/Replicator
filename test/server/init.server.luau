@@ -30,8 +30,6 @@ for _, Replica in ipairs(Replicas) do
     end)
 
     task.delay(15, function()
-        print(Replica.Data.TestArray)
         Replica.Data.TestArray = {}
-        print(Replica.Data.TestArray)
     end)
 end
