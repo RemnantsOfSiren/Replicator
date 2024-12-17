@@ -13,6 +13,7 @@ local Array = Sift.Array
 local Dictionary = Sift.Dictionary
 local CopyDeep = Dictionary.copyDeep
 
+local Replicas = {}
 local Replicators = {}
 
 local function FindReplicaById(Id: string?): Types.ClientReplica?
@@ -22,10 +23,10 @@ local function FindReplicaById(Id: string?): Types.ClientReplica?
 				continue
 			end
 
-			for _, _Replica in pairs(_Replicator.__Replicas) do
-				if _Replica.Id == Id then
-					return _Replica
-				end
+			local _Replica = _Replicator.__Replicas[Id]
+
+			if _Replica then
+				return _Replica
 			end
 		end
 	end
@@ -36,13 +37,44 @@ end
 local Replica = {}
 Replica.__index = Replica
 
+function Replica:GetChildren()
+	if self.__IsParent then
+		return Dictionary.filter(Replicas, function(_, _Replica)
+			return _Replica.__Parent == self
+		end)
+	else
+		warn("Replica is not a parent.")
+		return {}
+	end
+end
+
+--[=[
+	@function OnClientEvent
+	@within Replica
+	@client
+	@param Callback (Player: Player, ...any) -> nil
+	@return { Disconnect: () -> nil }
+
+	Listens for a client event, and fires the callback with the arguments passed.
+]=]
+function Replica:OnClientEvent(Callback: (Player: Player, ...any) -> nil): { Disconnect: () -> nil }
+	return self.__Fired:Connect(Callback)
+end
+
+function Replica:Fire(...)
+	local Args = { ... }
+
+	Replication.fireEvent.send({
+		Name = self.Name,
+		Id = self.Id,
+		Args = Args,
+	})
+end
+
 function Replica:Destroy()
-	self.__Write:Destroy()
-	self.__Change:Destroy()
-
+	Replicas[self.Id] = nil
 	self.Destroying:Fire()
-
-	task.delay(0.1, self.Destroying.Destroy, self.Destroying)
+	task.defer(self.__Cleaner.Destroy, self.__Cleaner)
 	table.clear(self)
 end
 
@@ -74,6 +106,7 @@ local function NewReplica(Config: {
 		__IsParent = Config.IsParent,
 
 		__Write = Cleaner:Construct(Signal),
+		__Fired = Cleaner:Construct(Signal),
 		__Change = Cleaner:Construct(Signal),
 		Destroying = Cleaner:Construct(Signal),
 
@@ -91,6 +124,8 @@ local function NewReplica(Config: {
 	self.__Cleaner:Connect(self.Destroying, function()
 		self.__Cleaner:Destroy()
 	end)
+
+	Replicas[Config.Id] = self
 
 	return self
 end
@@ -146,7 +181,7 @@ Replication.createReplica.listen(function(_Replica)
 		_Replicator = NewReplicator(_Replica.Name, _Replica.IsParent)
 	end
 
-	if not _Replicator.__Replicas[_Replica.Id] then
+	if not Replicas[_Replica.Id] then
 		task.spawn(_Replicator.AddReplica, _Replicator, NewReplica(_Replica))
 	else
 		Logger("Warn", "Replica already exists")
@@ -154,81 +189,81 @@ Replication.createReplica.listen(function(_Replica)
 end)
 
 Replication.destroyReplica.listen(function(Data)
-	local _Replicator = Replicators[Data.Name]
-	if _Replicator then
-		local _Replica = _Replicator.__Replicas[Data.Id]
+	local _Replica = Replicas[Data.Id]
 
-		if _Replica then
-			_Replica:Destroy()
+	if _Replica then
+		local Name = _Replica.Name
+		local _Replicator = Replicators[Name]
+		if _Replicator then
 			_Replicator.__Replicas[Data.Id] = nil
+		end
+		_Replica:Destroy()
+	end
+
+end)
+
+Replication.replicateChanges.listen(function(Data: Types.Packet)
+	local _Replica = Replicas[Data.Id]
+
+	if _Replica then
+		if _Replica.__IsParent then
+			warn("Parent replicas cannot be altered.")
+			return
+		end
+
+		table.sort(Data.Changes, function(A, B)
+			return A.Time < B.Time
+		end)
+
+		local AlteredKeys = {}
+
+		for _, Change in Data.Changes do
+			task.spawn(function()
+				local Path = Change.Path
+				local _Data = _Replica.Data
+				local _OldData = CopyDeep(_Replica.Data)
+
+				if table.find(AlteredKeys, table.concat(Path, ":")) then
+					return
+				end
+
+				for I = 1, #Path - 1 do
+					local Key = Path[I]
+					_Data = _Data[Key]
+
+					if not _Data then
+						break
+					end
+				end
+
+				if _Data then
+					table.insert(AlteredKeys, table.concat(Path, ":"))
+					local LastKey = Path[#Path]
+
+					if Array.is(_Data) then
+						if Change.Value == nil then
+							table.remove(_Data, LastKey :: number)
+						elseif _Data[LastKey] then
+							_Data[LastKey] = Change.Value
+						else
+							table.insert(_Data, LastKey :: number, Change.Value)
+						end
+					else
+						_Data[LastKey] = Change.Value
+					end
+
+					_Replica.__Change:Fire(Path, _Data[LastKey], _OldData)
+				end
+			end)
 		end
 	end
 end)
 
-type Packet = {
-	Name: string,
-	Id: string,
-	Changes: { { Time: number, Path: { string | number }, Value: any } },
-}
+Replication.fireEvent.listen(function(Data)
+	local _Replica = Replicas[Data.Id]
 
-Replication.replicateChanges.listen(function(Data: Packet)
-	local _Replicator = Replicators[Data.Name]
-
-	if _Replicator then
-		local _Replica = _Replicator.__Replicas[Data.Id]
-
-		if _Replica then
-			if _Replica.__IsParent then
-				warn("Parent replicas cannot be altered")
-				return
-			end
-
-			table.sort(Data.Changes, function(A, B)
-				return A.Time < B.Time
-			end)
-
-			local AlteredKeys = {}
-
-			for _, Change in Data.Changes do
-				task.spawn(function()
-					local Path = Change.Path
-					local _Data = _Replica.Data
-					local _OldData = CopyDeep(_Replica.Data)
-
-					if table.find(AlteredKeys, table.concat(Path, ":")) then
-						return
-					end
-
-					for I = 1, #Path - 1 do
-						local Key = Path[I]
-						_Data = _Data[Key]
-
-						if not _Data then
-							break
-						end
-					end
-
-					if _Data then
-						table.insert(AlteredKeys, table.concat(Path, ":"))
-						local LastKey = Path[#Path]
-
-						if Array.is(_Data) then
-							if Change.Value == nil then
-								table.remove(_Data, LastKey)
-							elseif _Data[LastKey] then
-								_Data[LastKey] = Change.Value
-							else
-								table.insert(_Data, LastKey, Change.Value)
-							end
-						else
-							_Data[LastKey] = Change.Value
-						end
-
-						_Replica.__Change:Fire(Path, _Data[LastKey], _OldData)
-					end
-				end)
-			end
-		end
+	if _Replica then
+		_Replica.__Fired:Fire(table.unpack(Data.Args))
 	end
 end)
 
@@ -245,6 +280,15 @@ Replication.getInitialReplicas.listen(function(_Replicas)
 		end
 
 		task.defer(_Replicator.AddReplica, _Replicator, NewReplica(_Replica))
+	end
+end)
+
+Replication.changeParent.listen(function(Info)
+	local _Replica = Replicas[Info.Id]
+
+	if _Replica then
+		local _Parent = FindReplicaById(Info.Parent)
+		_Replica.__Parent = _Parent
 	end
 end)
 

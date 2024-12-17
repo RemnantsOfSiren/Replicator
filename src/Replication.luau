@@ -22,7 +22,6 @@ return ByteNet.defineNamespace("Replication", function()
 
 		replicateChanges = ByteNet.definePacket({
 			value = ByteNet.struct({
-				Name = ByteNet.string,
 				Id = ByteNet.string,
 				Changes = ByteNet.array(ByteNet.struct({
 					Time = ByteNet.float64,
@@ -32,16 +31,26 @@ return ByteNet.defineNamespace("Replication", function()
 			}),
 		}),
 
-		destroyReplica = ByteNet.definePacket({
+		fireEvent = ByteNet.definePacket({
 			value = ByteNet.struct({
-				Name = ByteNet.string,
 				Id = ByteNet.string,
+				Args = ByteNet.array(ByteNet.unknown),
 			}),
+		}),
+
+		changeParent = ByteNet.definePacket({
+			value = ByteNet.struct({
+				Id = ByteNet.string,
+				Parent = ByteNet.string,
+			}),
+		}),
+
+		destroyReplica = ByteNet.definePacket({
+			value = ByteNet.string,
 		}),
 
 		replicateWrite = ByteNet.definePacket({
 			value = ByteNet.struct({
-				Name = ByteNet.string,
 				Id = ByteNet.string,
 				Method = ByteNet.string,
 				Args = ByteNet.array(ByteNet.unknown),

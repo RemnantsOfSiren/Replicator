@@ -1,4 +1,4 @@
-Replicator 2.0.0 official release
+Replicator2 Official Release (Version 1.1.2)
 
 Installation method
 
@@ -6,5 +6,5 @@ Installation method
 #wally.toml
 
 [dependencies]
-replicator = "remnantsofsiren/replicator2@^1.0.0"
+replicator = "remnantsofsiren/replicator2@^1.1.2"
 ```
