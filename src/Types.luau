@@ -3,6 +3,7 @@ local Signal = require(script.Parent.Parent.Signal) :: any
 
 export type ValidPath = { string | number } | string | number
 export type ToOptions = { Player } | Player | "All"
+export type Hook = (self: ServerReplica | ClientReplica, Path: ValidPath, Callback: (...any) -> nil) -> { Disconnect: () -> nil }
 
 export type Replica = {
 	Id: string,
@@ -17,20 +18,24 @@ export type Replica = {
 	__Cleaner: typeof(Trove.new()),
 	__Write: typeof(Signal.new()),
 	__Change: typeof(Signal.new()),
+	__Fired: typeof(Signal.new()),
 	Destroying: typeof(Signal.new()),
 
 	Destroy: (self: Replica) -> nil,
-	ListenToWrite: (self: ServerReplica | ClientReplica, Method: string, Callback: (...any) -> nil) -> nil,
-	ListenToChange: (self: ServerReplica | ClientReplica, Path: ValidPath, Callback: (...any) -> nil) -> nil,
-	ListenToNewKey: (self: ServerReplica | ClientReplica, Path: ValidPath, Callback: (...any) -> nil) -> nil,
-	ListenToKeyRemoved: (self: ServerReplica | ClientReplica, Path: ValidPath, Callback: (...any) -> nil) -> nil,
+	ListenToWrite: Hook?,
+	ListenToChange: Hook?,
+	ListenToNewKey: Hook?,
+	ListenToKeyRemoved: Hook?,
 }
 
 export type ServerReplica = Replica & {
-	__Data: { [string | number]: any },
+	__Data: { [string | number]: any }?,
+	__Ready: boolean?,
+	__IsParent: boolean?,
+	
 	To: ToOptions?,
 	Parent: ServerReplica?,
-	Set: (self: ServerReplica, Path: ValidPath, Value: any) -> nil,
+	SetParent: (self: ServerReplica, Parent: ServerReplica?) -> nil,
 	Write: (self: ServerReplica, Method: string, ...any) -> ...any,
 }
 
@@ -39,11 +44,19 @@ export type ClientReplica = Replica & {
 }
 
 export type Packet = {
-	Name: string,
 	Id: string,
 	Changes: {
-		[string]: { Time: number, Path: { string | number }, Value: any },
+		[number]: { Time: number, Path: { string | number }, Value: any },
 	},
+}
+
+export type Config = {
+	Name: string,
+	Tags: { any }?,
+	Data: { [string | number]: any }?,
+	WriteLib: ModuleScript?,
+	Parent: (ServerReplica | ClientReplica)?,
+	To: ToOptions?,
 }
 
 return {}
