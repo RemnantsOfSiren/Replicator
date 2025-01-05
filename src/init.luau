@@ -1,4 +1,4 @@
-local RunService = game:GetService("RunService")
+local Types = require(script.Types)
 
 --[=[
     @class Replica
@@ -7,4 +7,10 @@ local RunService = game:GetService("RunService")
 --[=[
     @class Replicator
 ]=]
-return if RunService:IsServer() then require(script.Server) else require(script.Client)
+
+export type ServerReplica = Types.ServerReplica
+export type ClientReplica = Types.ClientReplica
+
+return (
+	if game:GetService("RunService"):IsServer() then require(script.Server) else require(script.Client)
+) :: Types.ServerReplicator | Types.ClientReplicator

@@ -26,7 +26,7 @@ return ByteNet.defineNamespace("Replication", function()
 				Changes = ByteNet.array(ByteNet.struct({
 					Time = ByteNet.float64,
 					Path = ByteNet.array(ByteNet.unknown),
-					Value = ByteNet.unknown,
+					Value = ByteNet.optional(ByteNet.unknown),
 				})),
 			}),
 		}),

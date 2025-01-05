@@ -1,6 +1,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Replicator = require(ReplicatedStorage.Packages.Replicator) :: { any }
+local Replicator = require(ReplicatedStorage.Packages.Replicator)
 
 local Parent = Replicator.NewReplica({
     Name = "Parent",
@@ -19,27 +19,20 @@ for I = 1, 20 do
         Name = `Test_{I}`,
         Tags = { "Test" },
         Data = {
-            TestArray = {1, 2, 3},
+            TestArray = { { 1 }, { 2 }, { 3 }},
         },
         Parent = Parent,
     }))
 end
 
-print(`Parent {Parent.Name} has Children: `, Parent:GetChildren())
-
 for _, Replica in ipairs(Replicas) do
     task.delay(10, function() 
         Replica:Fire("TestEvent", 1, 2, 3)
-        Replica.Data.TestArray:Insert(10)
+        Replica.Data.TestArray:Insert({ 10 })
     end)
 
     task.delay(15, function()
         Replica:SetParent(Parent2)
-        Replica.Data.TestArray = {}
+        Replica.Data.TestArray:Remove(3)
     end)
 end
-
-task.delay(20, function()
-    print(`Parent {Parent.Name} has Children: `, Parent:GetChildren())
-    print(`Parent {Parent2.Name} has Children: `, Parent2:GetChildren())
-end)

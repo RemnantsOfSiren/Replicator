@@ -224,7 +224,7 @@ return {
 		end
 
 		task.spawn(Callback, _Data[ParsedPath[#ParsedPath]], nil)
-		return self:ListenToChange(Path, Callback, true)
+		return self:ListenToChange(Path, Callback, false)
 	end,
 
 	AddCleanupTask = function(

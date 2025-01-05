@@ -32,16 +32,8 @@ Replica.__index = Replica
 function Replica:Write(Method: string, ...: any)
 	if self.__WriteLib and self.__WriteLib[Method] then
 		local Return = { self.__WriteLib[Method](self, ...) }
-
-		local Packet = { Id = self.Id, Method = Method, Args = { ... } }
-		if self.To == "ALL" or not self.To then
-			Replication.replicateWrite.sendToAll(Packet)
-		elseif typeof(self.To) == "table" then
-			Replication.replicateWrite.sendToList(Packet, self.To)
-		else
-			Replication.replicateWrite.sendTo(Packet, self.To)
-		end
-
+		local Packet = { Method = Method, Args = { ... } }
+		self.__Fire(Replication.replicateWrite, Packet)
 		return unpack(Return)
 	end
 end
@@ -59,7 +51,7 @@ function Replica:GetChildren()
 			return _Replica.__Parent == self
 		end)
 	else
-		warn("Replica is not a parent.")
+		Logger("Warn", "Replica is not a parent.")
 		return {}
 	end
 end
@@ -87,23 +79,7 @@ end
 ]=]
 function Replica:Fire(...)
 	local Args = { ... }
-	
-	if self.To == "All" or not self.To then
-		Replication.fireEvent.sendToAll({
-			Id = self.Id,
-			Args = Args,
-		})
-	elseif typeof(self.To) == "table" then
-		Replication.fireEvent.sendToList({
-			Id = self.Id,
-			Args = Args,
-		}, self.To)
-	else
-		Replication.fireEvent.sendTo({
-			Id = self.Id,
-			Args = Args,
-		}, self.To)
-	end
+	self.__Fire(Replication.fireEvent, { Args = Args })
 end
 
 --[=[
@@ -117,7 +93,7 @@ end
 ]=]
 function Replica:SetParent(Parent: Types.ServerReplica)
 	if not Parent.__IsParent then
-		warn("Attempt to set a parent that is not a parent replica.")
+		Logger("Warn", "Attempt to set a parent that is not a parent replica.")
 		return
 	end
 
@@ -130,22 +106,9 @@ function Replica:SetParent(Parent: Types.ServerReplica)
 	self.__Parent = Parent
 	self.To = Parent.To
 
-	if self.To == "All" or not self.To then
-		Replication.changeParent.sendToAll({
-			Id = self.Id,
-			Parent = Parent.Id,
-		})
-	elseif typeof(self.To) == "table" then
-		Replication.changeParent.sendToList({
-			Id = self.Id,
-			Parent = Parent.Id,
-		}, self.To)
-	else
-		Replication.changeParent.sendTo({
-			Id = self.Id,
-			Parent = Parent.Id,
-		}, self.To)
-	end
+	self.__Fire(Replication.changeParent, {
+		Parent = Parent.Id,
+	})
 end
 
 --[=[
@@ -164,10 +127,7 @@ function Replica:Destroy()
 
 	Replicas[self.Id] = nil
 
-	Replication.destroyReplica.sendToAll({
-		Name = self.Name,
-		Id = self.Id,
-	})
+	Replication.destroyReplica.sendToAll(self.Id)
 
 	table.clear(self)
 end
@@ -266,7 +226,9 @@ end
 
 local ValidKeyTypes = { "string", "number" }
 
-local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: { [number]: any }?)
+local function ListenToTable(registerUpdate: (...any) -> nil, Table, Indicies: { [number]: any }?)
+	local OldData = CopyDeep(Table)
+
 	local Method = setmetatable({
 		__type = "Replicated Table",
 		__value = {},
@@ -288,14 +250,15 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: { [
 			local IsTable = type(Value) == "table"
 
 			if IsTable and Value.__type == "Replicated Table" then
-				warn("Attempt to assign a replicated table to another replicated table.")
+				Logger("Warn", "Attempt to assign a replicated table to another replicated table.")
 				return
 			end
 
 			local Updated = false
 
 			if Sift.Array.is(Table) and Value == nil then
-				return warn("Use :Remove() to remove an element from an array.")
+				Logger("Warn", "Use :Remove() to remove an element from an array.")
+				return
 			else
 				local TValue = rawget(Table, Key)
 				if
@@ -311,11 +274,12 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: { [
 			_Indicies[#_Indicies + 1] = Key
 
 			if Updated then
-				_Replica.__Change:Fire(_Indicies, if IsTable then CopyDeep(Value) else Value, CopyDeep(_Replica.__Data))
+				registerUpdate(_Indicies, if IsTable then CopyDeep(Value) else Value, OldData)
+				OldData = CopyDeep(Table)
 			end
 
 			if IsTable then
-				rawset(self.__value, Key, ListenToTable(_Replica, Value, _Indicies))
+				rawset(self.__value, Key, ListenToTable(registerUpdate, Value, _Indicies))
 			end
 
 			if (Sift.Array.is(Table) or Sift.Dictionary.count(Table) == 0) and not rawget(self, "Insert") then
@@ -327,37 +291,41 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: { [
 					InsertIndices[#InsertIndices + 1] = Index
 					table.insert(Table, Index, _Value)
 					if _Value and type(_Value) == "table" then
-						rawset(self, Index, ListenToTable(_Replica, _Value, InsertIndices))
+						rawset(self, Index, ListenToTable(registerUpdate, _Value, InsertIndices))
 					end
-					_Replica.__Change:Fire(InsertIndices, _Value, CopyDeep(_Replica.__Data))
+					registerUpdate(InsertIndices, _Value, OldData)
+					OldData = CopyDeep(Table)
 				end)
 				rawset(self, "insert", rawget(self, "Insert"))
 				rawset(self, "Remove", function(_, Index: number)
 					local _Indicies = table.clone(Indicies or {})
 					_Indicies[#_Indicies + 1] = Index
 					table.remove(Table, Index)
-					_Replica.__Change:Fire(_Indicies, nil, CopyDeep(_Replica.__Data))
+					registerUpdate(_Indicies, nil, OldData)
+					OldData = CopyDeep(Table)
 				end)
 				rawset(self, "remove", rawget(self, "Remove"))
 			elseif not Sift.Array.is(Table) and rawget(self, "Insert") then
-				rawset(self, "Insert", nil)
-				rawset(self, "insert", nil)
-				rawset(self, "Remove", nil)
-				rawset(self, "remove", nil)
+				rawset(self, "Insert", nil :: any)
+				rawset(self, "insert", nil :: any)
+				rawset(self, "Remove", nil :: any)
+				rawset(self, "remove", nil :: any)
 			end
 		end,
 		__iter = function(self)
 			local AlreadyVisited = {}
 			local Cleaner = {}
 
-			return function() : (any, any, any)
+			return function(): (any, any, any)
 				for Index, Value in pairs(Table) do
 					if not table.find(AlreadyVisited, Index) then
 						table.insert(AlreadyVisited, Index)
 
 						local _Indicies = table.clone(Indicies or {})
 						_Indicies[#_Indicies + 1] = Index
-						Value = if type(Value) == "table" then ListenToTable(_Replica, Value, _Indicies) else Value
+						Value = if type(Value) == "table"
+							then ListenToTable(registerUpdate, Value, _Indicies)
+							else Value
 
 						return Index,
 							Value,
@@ -408,16 +376,18 @@ local function ListenToTable(_Replica: Types.ServerReplica, Table, Indicies: { [
 			InsertIndices[#InsertIndices + 1] = Index
 			table.insert(Table, Index, _Value)
 			if _Value and type(_Value) == "table" then
-				rawset(Method, Index, ListenToTable(_Replica, _Value, InsertIndices))
+				rawset(Method, Index, ListenToTable(registerUpdate, _Value, InsertIndices))
 			end
-			_Replica.__Change:Fire(InsertIndices, _Value, CopyDeep(_Replica.__Data))
+			registerUpdate(InsertIndices, _Value, OldData)
+			OldData = CopyDeep(Table)
 		end)
 		rawset(Method, "insert", rawget(Method, "Insert"))
 		rawset(Method, "Remove", function(_, Index: number)
 			local _Indicies = table.clone(Indicies or {})
 			_Indicies[#_Indicies + 1] = Index
 			table.remove(Table, Index)
-			_Replica.__Change:Fire(_Indicies, nil, CopyDeep(_Replica.__Data))
+			registerUpdate(_Indicies, nil, OldData)
+			OldData = CopyDeep(Table)
 		end)
 		rawset(Method, "remove", rawget(Method, "Remove"))
 	end
@@ -452,6 +422,18 @@ local function NewReplica(Config: Types.Config)
 		__Cleaner = Cleaner,
 	}, Replica)
 
+	self.__Fire = function(Event, Packet)
+		Packet.Id = self.Id
+
+		if Config.To == "All" or not Config.To then
+			Event.sendToAll(Packet)
+		elseif typeof(Config.To) == "table" then
+			Event.sendToList(Packet, Config.To)
+		else
+			Event.sendTo(Packet, Config.To)
+		end
+	end
+
 	for Key, Function in SharedFunctions do
 		self[Key] = Function
 	end
@@ -462,9 +444,29 @@ local function NewReplica(Config: Types.Config)
 		self.__Cleaner:Destroy()
 	end)
 
+	local Changes = {} :: { { Time: number, Path: { string | number }, Value: any } }
+
+	local function registerUpdate(Path, Value, OldData)
+		self.__Change:Fire(Path, Value, self.__OldData)
+		self.__OldData = CopyDeep(OldData)
+
+		local Found = Array.findWhere(Changes, function(Change)
+			return Path == Change.Path
+		end)
+
+		if Found and os.clock() > Found.Time then
+			Found.Value = Value
+			Found.Time = os.clock()
+			return
+		end
+
+		table.insert(Changes, { Time = os.clock(), Path = Path, Value = Value })
+	end
+
 	if Config.Data and not self.__IsParent then
 		self.__Data = Config.Data
-		self.Data = ListenToTable(self, self.__Data)
+		self.__OldData = CopyDeep(self.__Data)
+		self.Data = ListenToTable(registerUpdate, self.__Data)
 	end
 
 	if
@@ -478,48 +480,15 @@ local function NewReplica(Config: Types.Config)
 		Logger("Error", "WriteLib must be a ModuleScript and a descendant of ReplicatedStorage.")
 	end
 
-	local Changes = {} :: { 
-		{ Time: number, Path: { string | number }, Value: any }
-	}
-
-	self.__Change:Connect(function(Path, Value)
-		table.insert(Changes, { Time = os.clock(), Path = Path, Value = Value })
-	end)
-
 	self.__Cleaner:Add(
 		task.delay(0.1, function()
 			while true do
 				if #Changes > 0 and self.__Ready then
-					local Keys = {}
+					print(Changes)
 
-					Changes = Array.filter(
-						Array.sort(Changes, function(A, B)
-							return A.Time > B.Time
-						end),
-						function(Change)
-							local Id = table.concat(Change.Path, ":")
-
-							if not Keys[Id] then
-								Keys[Id] = true
-								return true
-							end
-
-							return false
-						end
-					)
-
-					local Packet: Types.Packet = {
-						Id = self.Id,
+					self.__Fire(Replication.replicateChanges, {
 						Changes = Changes,
-					}
-
-					if self.To == "All" or not self.To then
-						Replication.replicateChanges.sendToAll(Packet)
-					elseif typeof(self.To) == "table" then
-						Replication.replicateChanges.sendToList(Packet, self.To)
-					else
-						Replication.replicateChanges.sendTo(Packet, self.To)
-					end
+					})
 
 					table.clear(Changes)
 				end
@@ -530,25 +499,15 @@ local function NewReplica(Config: Types.Config)
 		true
 	)
 
-	local CreatePacket = {
-		Id = self.Id,
+	self.__Fire(Replication.createReplica, {
 		Name = self.Name,
 		Tags = self.Tags,
 		Data = self.__Data and CopyDeep(self.__Data),
 		WriteLib = self.WriteLib,
 		Parent = Config.Parent and Config.Parent.Id,
-	}
-
-	if Config.To == "All" or not Config.To then
-		task.spawn(Replication.createReplica.sendToAll, CreatePacket)
-	elseif typeof(Config.To) == "table" then
-		task.spawn(Replication.createReplica.sendToList, CreatePacket, Config.To)
-	else
-		task.spawn(Replication.createReplica.sendTo, CreatePacket, Config.To)
-	end
+	})
 
 	self.__Ready = true
-
 	Replicas[self.Id] = self
 
 	return self
@@ -556,26 +515,26 @@ end
 
 Replication.getInitialReplicas.listen(function(_, Player)
 	Replication.getInitialReplicas.sendTo(
-		Dictionary.values(
-		Dictionary.map(
-		Dictionary.filter(
-			Replicas,
+		Dictionary.values(Dictionary.map(
+			Dictionary.filter(Replicas, function(_Replica)
+				return _Replica.To == "All"
+					or (typeof(_Replica.To) == "table" and table.find(_Replica.To, Player))
+					or _Replica.To == Player
+			end),
 			function(_Replica)
-				return _Replica.To == "All" or (typeof(_Replica.To) == "table" and table.find(_Replica.To, Player)) or _Replica.To == Player
+				return {
+					Id = _Replica.Id,
+					Name = _Replica.Name,
+					Tags = _Replica.Tags,
+					Data = if not _Replica.__IsParent then CopyDeep(_Replica.__Data) else nil,
+					Parent = if _Replica.__Parent then _Replica.__Parent.Id else nil,
+					IsParent = _Replica.__IsParent,
+					WriteLib = _Replica.WriteLib,
+				}
 			end
-		),
-		function(_Replica)
-			return {
-				Id = _Replica.Id,
-				Name = _Replica.Name,
-				Tags = _Replica.Tags,
-				Data = if not _Replica.__IsParent then CopyDeep(_Replica.__Data) else nil,
-				Parent = if _Replica.__Parent then _Replica.__Parent.Id else nil,
-				IsParent = _Replica.__IsParent,
-				WriteLib = _Replica.WriteLib,
-			}
-		end
-	)), Player)
+		)),
+		Player
+	)
 end)
 
 Replication.fireEvent.listen(function(Packet, Player)

@@ -151,6 +151,14 @@ function Replicator:AddListener(Callback)
 end
 
 function Replicator:AddReplica(_Replica)
+	if self.__Replicas[_Replica.Id] then
+		Logger("Warn", "Replica already exists")
+		return
+	elseif _Replica.Name ~= self.Name then
+		Logger("Warn", "Replica name does not match replicator name.")
+		return
+	end
+
 	self.__Replicas[_Replica.Id] = _Replica
 	for _, Listener in self.__Listeners do
 		task.spawn(Listener, _Replica)
@@ -175,11 +183,7 @@ local function NewReplicator(Name: string, IsParent: boolean)
 end
 
 Replication.createReplica.listen(function(_Replica)
-	local _Replicator = Replicators[_Replica.Name]
-
-	if not _Replicator then
-		_Replicator = NewReplicator(_Replica.Name, _Replica.IsParent)
-	end
+	local _Replicator = NewReplicator(_Replica.Name, _Replica.IsParent)
 
 	if not Replicas[_Replica.Id] then
 		task.spawn(_Replicator.AddReplica, _Replicator, NewReplica(_Replica))
@@ -188,18 +192,17 @@ Replication.createReplica.listen(function(_Replica)
 	end
 end)
 
-Replication.destroyReplica.listen(function(Data)
-	local _Replica = Replicas[Data.Id]
+Replication.destroyReplica.listen(function(Id)
+	local _Replica = Replicas[Id]
 
 	if _Replica then
 		local Name = _Replica.Name
 		local _Replicator = Replicators[Name]
 		if _Replicator then
-			_Replicator.__Replicas[Data.Id] = nil
+			_Replicator.__Replicas[Id] = nil
 		end
 		_Replica:Destroy()
 	end
-
 end)
 
 Replication.replicateChanges.listen(function(Data: Types.Packet)
@@ -207,7 +210,7 @@ Replication.replicateChanges.listen(function(Data: Types.Packet)
 
 	if _Replica then
 		if _Replica.__IsParent then
-			warn("Parent replicas cannot be altered.")
+			Logger("Warn", "Parent replicas cannot be altered.")
 			return
 		end
 
@@ -215,46 +218,39 @@ Replication.replicateChanges.listen(function(Data: Types.Packet)
 			return A.Time < B.Time
 		end)
 
-		local AlteredKeys = {}
-
 		for _, Change in Data.Changes do
-			task.spawn(function()
-				local Path = Change.Path
-				local _Data = _Replica.Data
+			local Path = Change.Path
+			local _Data = _Replica.Data
+
+			for I = 1, #Path - 1 do
+				local Key = Path[I]
+				local Origin = _Data
+				_Data = _Data[Key]
+
+				if not _Data then
+					Origin[Key] = {} -- maybe I should intend for this to happen? idk
+					_Data = Origin[Key]
+				end
+			end
+
+			if _Data then
 				local _OldData = CopyDeep(_Replica.Data)
+				local LastKey = Path[#Path]
 
-				if table.find(AlteredKeys, table.concat(Path, ":")) then
-					return
-				end
-
-				for I = 1, #Path - 1 do
-					local Key = Path[I]
-					_Data = _Data[Key]
-
-					if not _Data then
-						break
-					end
-				end
-
-				if _Data then
-					table.insert(AlteredKeys, table.concat(Path, ":"))
-					local LastKey = Path[#Path]
-
-					if Array.is(_Data) then
-						if Change.Value == nil then
-							table.remove(_Data, LastKey :: number)
-						elseif _Data[LastKey] then
-							_Data[LastKey] = Change.Value
-						else
-							table.insert(_Data, LastKey :: number, Change.Value)
-						end
-					else
+				if Array.is(_Data) then
+					if Change.Value == nil then
+						table.remove(_Data, LastKey :: number)
+					elseif _Data[LastKey] then
 						_Data[LastKey] = Change.Value
+					else
+						table.insert(_Data, LastKey :: number, Change.Value)
 					end
-
-					_Replica.__Change:Fire(Path, _Data[LastKey], _OldData)
+				else
+					_Data[LastKey] = Change.Value
 				end
-			end)
+
+				_Replica.__Change:Fire(Path, _Data[LastKey], _OldData)
+			end
 		end
 	end
 end)

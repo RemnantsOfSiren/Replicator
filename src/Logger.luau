@@ -1,12 +1,13 @@
 export type Level = "Info" | "Warn" | "Error"
 
 return function(Execution: Level, ...: any)
+	local Args = { ... }
+
 	if Execution == "Info" then
-		print("[[Replicator-Log]]: ", ...)
+		print("[[Replicator-Log]]: ", unpack(Args))
 	elseif Execution == "Warn" then
-		warn("[[Replicator-Log]]: ", ..., debug.traceback("", 10))
+		warn("[[Replicator-Log]]: ", unpack(Args), debug.traceback("", 4))
 	elseif Execution == "Error" then
-		local Args = { ... }
 		local Str = ""
 
 		for I = 1, #Args do
