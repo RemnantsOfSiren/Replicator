@@ -484,8 +484,6 @@ local function NewReplica(Config: Types.Config)
 		task.delay(0.1, function()
 			while true do
 				if #Changes > 0 and self.__Ready then
-					print(Changes)
-
 					self.__Fire(Replication.replicateChanges, {
 						Changes = Changes,
 					})
