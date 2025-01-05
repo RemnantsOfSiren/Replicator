@@ -152,7 +152,6 @@ end
 
 function Replicator:AddReplica(_Replica)
 	if self.__Replicas[_Replica.Id] then
-		Logger("Warn", "Replica already exists")
 		return
 	elseif _Replica.Name ~= self.Name then
 		Logger("Warn", "Replica name does not match replicator name.")
@@ -224,12 +223,10 @@ Replication.replicateChanges.listen(function(Data: Types.Packet)
 
 			for I = 1, #Path - 1 do
 				local Key = Path[I]
-				local Origin = _Data
 				_Data = _Data[Key]
 
 				if not _Data then
-					Origin[Key] = {} -- maybe I should intend for this to happen? idk
-					_Data = Origin[Key]
+					return
 				end
 			end
 
@@ -275,7 +272,9 @@ Replication.getInitialReplicas.listen(function(_Replicas)
 			_Replicator = NewReplicator(_Replica.Name, _Replica.IsParent)
 		end
 
-		task.defer(_Replicator.AddReplica, _Replicator, NewReplica(_Replica))
+		if not Replicas[_Replica.Id] then
+			task.spawn(_Replicator.AddReplica, _Replicator, NewReplica(_Replica))
+		end
 	end
 end)
 
