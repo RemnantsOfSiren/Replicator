@@ -8,8 +8,6 @@ for i = 1, 20 do
             Replica:ListenToChange("TestArray", function(Value, OldValue)
                 print("NewValue:", Value, "OldValue:", OldValue)
             end)
-
-            Replica:OnClientEvent(print)
         end)
     end)
 end
