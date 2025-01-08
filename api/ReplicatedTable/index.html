@@ -42,8 +42,8 @@ for Index, Value, SetValue in Array do
     SetValue(10)
 end
 ```"><link data-rh="true" rel="canonical" href="https://RemnantsOfSiren.github.io/Replicator/api/ReplicatedTable"><link data-rh="true" rel="alternate" href="https://RemnantsOfSiren.github.io/Replicator/api/ReplicatedTable" hreflang="en"><link data-rh="true" rel="alternate" href="https://RemnantsOfSiren.github.io/Replicator/api/ReplicatedTable" hreflang="x-default"><link rel="stylesheet" href="/Replicator/assets/css/styles.19a5646f.css">
-<link rel="preload" href="/Replicator/assets/js/runtime~main.4266e35a.js" as="script">
-<link rel="preload" href="/Replicator/assets/js/main.0669a7e0.js" as="script">
+<link rel="preload" href="/Replicator/assets/js/runtime~main.ef0b29f4.js" as="script">
+<link rel="preload" href="/Replicator/assets/js/main.ce2a226d.js" as="script">
 </head>
 <body class="navigation-with-keyboard">
 <script>!function(){function e(e){document.documentElement.setAttribute("data-theme",e)}var t=function(){var e=null;try{e=localStorage.getItem("theme")}catch(e){}return e}();null!==t?e(t):window.matchMedia("(prefers-color-scheme: dark)").matches?e("dark"):(window.matchMedia("(prefers-color-scheme: light)").matches,e("light"))}()</script><div id="__docusaurus">
@@ -67,7 +67,7 @@ end
     <span class="token function">SetValue</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">)</span>
 <span class="token keyword">end</span>
 </code></pre>
-</div></header><h2 class="anchor anchorWithStickyNavbar_LWe7" id="functions">Functions<a href="#functions" class="hash-link" aria-label="Direct link to Functions" title="Direct link to Functions">​</a></h2><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="Insert"><code style="text-decoration:none">Insert</code><a href="#Insert" class="hash-link" aria-label="Direct link to Insert" title="Direct link to Insert">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/RemnantsOfSiren/Replicator/blob/master/src/Server.luau#L229"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>ReplicatedTable<!-- -->:</code><code class="green_DgR4">Insert</code><code>(</code><div class="inset_uKQm"><div><code>Index<!-- -->: </code><code class="blue_P4bS">number?</code><code>,</code></div><div><code>Value<!-- -->: </code><code class="blue_P4bS">any</code></div></div><code>) → </code><code class="blue_P4bS">nil</code></div><div>
+</div></header><h2 class="anchor anchorWithStickyNavbar_LWe7" id="functions">Functions<a href="#functions" class="hash-link" aria-label="Direct link to Functions" title="Direct link to Functions">​</a></h2><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="Insert"><code style="text-decoration:none">Insert</code><a href="#Insert" class="hash-link" aria-label="Direct link to Insert" title="Direct link to Insert">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/RemnantsOfSiren/Replicator/blob/master/src/Server.luau#L189"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>ReplicatedTable<!-- -->:</code><code class="green_DgR4">Insert</code><code>(</code><div class="inset_uKQm"><div><code>Index<!-- -->: </code><code class="blue_P4bS">number?</code><code>,</code></div><div><code>Value<!-- -->: </code><code class="blue_P4bS">any</code></div></div><code>) → </code><code class="blue_P4bS">nil</code></div><div>
 <ul>
   <li>If the table is an array, inserts a value into the array at the specified index or at the end of the array.</li>
   <li>If the table is a dictionary, this function call will not exist and may throw an error.</li>
@@ -90,7 +90,7 @@ Array<span class="token punctuation">:</span><span class="token function">Insert
 <span class="token keyword">end</span>
 <span class="token comment">---> 1, 10, 2, 3, 15</span>
 </code></pre>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="Remove"><code style="text-decoration:none">Remove</code><a href="#Remove" class="hash-link" aria-label="Direct link to Remove" title="Direct link to Remove">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/RemnantsOfSiren/Replicator/blob/master/src/Server.luau#L258"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>ReplicatedTable<!-- -->:</code><code class="green_DgR4">Remove</code><code>(</code><code>Index<!-- -->: </code><code class="blue_P4bS">number</code><code>) → </code><code class="blue_P4bS">nil</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="Remove"><code style="text-decoration:none">Remove</code><a href="#Remove" class="hash-link" aria-label="Direct link to Remove" title="Direct link to Remove">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/RemnantsOfSiren/Replicator/blob/master/src/Server.luau#L218"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>ReplicatedTable<!-- -->:</code><code class="green_DgR4">Remove</code><code>(</code><code>Index<!-- -->: </code><code class="blue_P4bS">number</code><code>) → </code><code class="blue_P4bS">nil</code></div><div>
 <ul>
   <li>If the table is an array, removes the value at the specified index.</li>
   <li>If the table is a dictionary, this function call will not exist and may throw an error.</li>
@@ -112,7 +112,7 @@ Array<span class="token punctuation">:</span><span class="token function">Remove
 <span class="token keyword">end</span>
 <span class="token comment">---> 1, 3</span>
 </code></pre>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="Get"><code style="text-decoration:none">Get</code><a href="#Get" class="hash-link" aria-label="Direct link to Get" title="Direct link to Get">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/RemnantsOfSiren/Replicator/blob/master/src/Server.luau#L266"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>ReplicatedTable<!-- -->:</code><code class="green_DgR4">Get</code><code>(</code><code>) → </code><code class="blue_P4bS">any</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="Get"><code style="text-decoration:none">Get</code><a href="#Get" class="hash-link" aria-label="Direct link to Get" title="Direct link to Get">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/RemnantsOfSiren/Replicator/blob/master/src/Server.luau#L226"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>ReplicatedTable<!-- -->:</code><code class="green_DgR4">Get</code><code>(</code><code>) → </code><code class="blue_P4bS">any</code></div><div>
 <p>Returns a deep copy of the table.</p>
 </div></div></article></div><details><summary>Show raw api</summary><pre style="max-width:100%;white-space:pre-wrap">{
     &quot;functions&quot;: [
@@ -139,7 +139,7 @@ Array<span class="token punctuation">:</span><span class="token function">Remove
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 229,
+                &quot;line&quot;: 189,
                 &quot;path&quot;: &quot;src/Server.luau&quot;
             }
         },
@@ -161,7 +161,7 @@ Array<span class="token punctuation">:</span><span class="token function">Remove
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 258,
+                &quot;line&quot;: 218,
                 &quot;path&quot;: &quot;src/Server.luau&quot;
             }
         },
@@ -177,7 +177,7 @@ Array<span class="token punctuation">:</span><span class="token function">Remove
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 266,
+                &quot;line&quot;: 226,
                 &quot;path&quot;: &quot;src/Server.luau&quot;
             }
         }
@@ -190,11 +190,11 @@ Array<span class="token punctuation">:</span><span class="token function">Remove
         &quot;Server&quot;
     ],
     &quot;source&quot;: {
-        &quot;line&quot;: 198,
+        &quot;line&quot;: 158,
         &quot;path&quot;: &quot;src/Server.luau&quot;
     }
-}</pre></details></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#types" class="table-of-contents__link toc-highlight">Types</a></li><li><a href="#properties" class="table-of-contents__link toc-highlight">Properties</a></li><li><a href="#functions" class="table-of-contents__link toc-highlight">Functions</a><ul><li><a href="#Get" class="table-of-contents__link toc-highlight">:Get</a></li><li><a href="#Insert" class="table-of-contents__link toc-highlight">:Insert</a></li><li><a href="#Remove" class="table-of-contents__link toc-highlight">:Remove</a></li></ul></li></ul></div></div></div></div></main></div></div><footer class="footer footer--dark"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">Copyright © 2024 RemnantsOfSiren. Built with Moonwave and Docusaurus.</div></div></div></footer></div>
-<script src="/Replicator/assets/js/runtime~main.4266e35a.js"></script>
-<script src="/Replicator/assets/js/main.0669a7e0.js"></script>
+}</pre></details></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#types" class="table-of-contents__link toc-highlight">Types</a></li><li><a href="#properties" class="table-of-contents__link toc-highlight">Properties</a></li><li><a href="#functions" class="table-of-contents__link toc-highlight">Functions</a><ul><li><a href="#Get" class="table-of-contents__link toc-highlight">:Get</a></li><li><a href="#Insert" class="table-of-contents__link toc-highlight">:Insert</a></li><li><a href="#Remove" class="table-of-contents__link toc-highlight">:Remove</a></li></ul></li></ul></div></div></div></div></main></div></div><footer class="footer footer--dark"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">Copyright © 2025 RemnantsOfSiren. Built with Moonwave and Docusaurus.</div></div></div></footer></div>
+<script src="/Replicator/assets/js/runtime~main.ef0b29f4.js"></script>
+<script src="/Replicator/assets/js/main.ce2a226d.js"></script>
 </body>
 </html>
