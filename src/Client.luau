@@ -49,7 +49,7 @@ function Replica:GetChildren()
 end
 
 --[=[
-	@function OnClientEvent
+	@method OnClientEvent
 	@within Replica
 	@client
 	@param Callback (Player: Player, ...any) -> nil
