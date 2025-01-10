@@ -234,7 +234,7 @@ Replication.replicateChanges.listen(function(Data: Types.Packet)
 				local _OldData = CopyDeep(_Replica.Data)
 				local LastKey = Path[#Path]
 
-				if LastKey ~= nil and (Array.is(_Data) or Dictionary.count(_Data) == 0) then
+				if LastKey ~= nil and type(LastKey) == "number" and (Array.is(_Data) or Dictionary.count(_Data) == 0) then
 					if Change.Value == nil then
 						table.remove(_Data, LastKey :: number)
 					elseif _Data[LastKey] then
