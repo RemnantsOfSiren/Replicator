@@ -19,7 +19,7 @@ for I = 1, 20 do
         Name = `Test_{I}`,
         Tags = { "Test" },
         Data = {
-            TestArray = { { 1 }, { 2 }, { 3 }},
+            TestArray = { { 1 }, { 2 }, { 3 } },
         },
         Parent = Parent,
     }))
