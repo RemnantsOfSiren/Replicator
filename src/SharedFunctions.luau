@@ -200,10 +200,14 @@ return {
 
 	ListenToRaw = function(self: Types.ServerReplica | Types.ClientReplica, Callback: (...any) -> nil)
 		return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
+			local LastIndex = ChangedPath[#ChangedPath]
+			
 			for Index = 1, #ChangedPath - 1 do
 				OldValue = OldValue[ChangedPath[Index]]
 			end
-			task.spawn(Callback, ChangedPath, NewValue, OldValue[ChangedPath[#ChangedPath]])
+
+			local LastValue = OldValue and OldValue[LastIndex]
+			task.spawn(Callback, ChangedPath, NewValue, LastValue)
 		end)
 	end,
 
