@@ -260,7 +260,18 @@ Replication.packets.fireEvent.listen(function(Data)
 	end
 end)
 
-Replication.packets.getInitialReplicas.listen(function(_Replicas)
+Replication.packets.changeParent.listen(function(Info)
+	local _Replica = Replicas[Info.Id]
+
+	if _Replica then
+		local _Parent = FindReplicaById(Info.Parent)
+		_Replica.__Parent = _Parent
+	end
+end)
+
+task.defer(function()
+	local _Replicas = Replication.queries.getInitialReplicas.invoke()
+	
 	table.sort(_Replicas, function(A, B)
 		return A.IsParent and not B.IsParent
 	end)
@@ -277,17 +288,6 @@ Replication.packets.getInitialReplicas.listen(function(_Replicas)
 		end
 	end
 end)
-
-Replication.packets.changeParent.listen(function(Info)
-	local _Replica = Replicas[Info.Id]
-
-	if _Replica then
-		local _Parent = FindReplicaById(Info.Parent)
-		_Replica.__Parent = _Parent
-	end
-end)
-
-Replication.packets.getInitialReplicas.send()
 
 --[=[
     @function ListenToNewReplica
