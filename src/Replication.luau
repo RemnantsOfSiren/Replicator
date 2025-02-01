@@ -12,49 +12,51 @@ return ByteNet.defineNamespace("Replication", function()
 	})
 
 	return {
-		createReplica = ByteNet.definePacket({
-			value = Replica,
-		}),
-
-		getInitialReplicas = ByteNet.definePacket({
-			value = ByteNet.optional(ByteNet.array(Replica)),
-		}),
-
-		replicateChanges = ByteNet.definePacket({
-			value = ByteNet.struct({
-				Id = ByteNet.string,
-				Changes = ByteNet.array(ByteNet.struct({
-					Time = ByteNet.float64,
-					Path = ByteNet.array(ByteNet.unknown),
-					Value = ByteNet.optional(ByteNet.unknown),
-				})),
+		packets = {
+			createReplica = ByteNet.definePacket({
+				value = Replica,
 			}),
-		}),
 
-		fireEvent = ByteNet.definePacket({
-			value = ByteNet.struct({
-				Id = ByteNet.string,
-				Args = ByteNet.array(ByteNet.unknown),
+			getInitialReplicas = ByteNet.definePacket({
+				value = ByteNet.optional(ByteNet.array(Replica)),
 			}),
-		}),
 
-		changeParent = ByteNet.definePacket({
-			value = ByteNet.struct({
-				Id = ByteNet.string,
-				Parent = ByteNet.string,
+			replicateChanges = ByteNet.definePacket({
+				value = ByteNet.struct({
+					Id = ByteNet.string,
+					Changes = ByteNet.array(ByteNet.struct({
+						Time = ByteNet.float64,
+						Path = ByteNet.array(ByteNet.unknown),
+						Value = ByteNet.optional(ByteNet.unknown),
+					})),
+				}),
 			}),
-		}),
 
-		destroyReplica = ByteNet.definePacket({
-			value = ByteNet.string,
-		}),
-
-		replicateWrite = ByteNet.definePacket({
-			value = ByteNet.struct({
-				Id = ByteNet.string,
-				Method = ByteNet.string,
-				Args = ByteNet.array(ByteNet.unknown),
+			fireEvent = ByteNet.definePacket({
+				value = ByteNet.struct({
+					Id = ByteNet.string,
+					Args = ByteNet.array(ByteNet.unknown),
+				}),
 			}),
-		}),
+
+			changeParent = ByteNet.definePacket({
+				value = ByteNet.struct({
+					Id = ByteNet.string,
+					Parent = ByteNet.string,
+				}),
+			}),
+
+			destroyReplica = ByteNet.definePacket({
+				value = ByteNet.string,
+			}),
+
+			replicateWrite = ByteNet.definePacket({
+				value = ByteNet.struct({
+					Id = ByteNet.string,
+					Method = ByteNet.string,
+					Args = ByteNet.array(ByteNet.unknown),
+				}),
+			}),
+		}
 	}
 end)
