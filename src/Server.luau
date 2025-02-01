@@ -33,7 +33,7 @@ function Replica:Write(Method: string, ...: any)
 	if self.__WriteLib and self.__WriteLib[Method] then
 		local Return = { self.__WriteLib[Method](self, ...) }
 		local Packet = { Method = Method, Args = { ... } }
-		self.__Fire(Replication.replicateWrite, Packet)
+		self.__Fire(Replication.packets.replicateWrite, Packet)
 		return unpack(Return)
 	end
 end
@@ -79,7 +79,7 @@ end
 ]=]
 function Replica:Fire(...)
 	local Args = { ... }
-	self.__Fire(Replication.fireEvent, { Args = Args })
+	self.__Fire(Replication.packets.fireEvent, { Args = Args })
 end
 
 --[=[
@@ -106,7 +106,7 @@ function Replica:SetParent(Parent: Types.ServerReplica)
 	self.__Parent = Parent
 	self.To = Parent.To
 
-	self.__Fire(Replication.changeParent, {
+	self.__Fire(Replication.packets.changeParent, {
 		Parent = Parent.Id,
 	})
 end
@@ -127,7 +127,7 @@ function Replica:Destroy()
 
 	Replicas[self.Id] = nil
 
-	Replication.destroyReplica.sendToAll(self.Id)
+	Replication.packets.destroyReplica.sendToAll(self.Id)
 
 	table.clear(self)
 end
@@ -484,7 +484,7 @@ local function NewReplica(Config: Types.Config)
 		task.delay(0.1, function()
 			while true do
 				if #Changes > 0 and self.__Ready then
-					self.__Fire(Replication.replicateChanges, {
+					self.__Fire(Replication.packets.replicateChanges, {
 						Changes = Changes,
 					})
 
@@ -497,7 +497,7 @@ local function NewReplica(Config: Types.Config)
 		true
 	)
 
-	self.__Fire(Replication.createReplica, {
+	self.__Fire(Replication.packets.createReplica, {
 		Name = self.Name,
 		Tags = self.Tags,
 		Data = self.__Data and CopyDeep(self.__Data),
@@ -511,8 +511,8 @@ local function NewReplica(Config: Types.Config)
 	return self
 end
 
-Replication.getInitialReplicas.listen(function(_, Player)
-	Replication.getInitialReplicas.sendTo(
+Replication.packets.getInitialReplicas.listen(function(_, Player)
+	Replication.packets.getInitialReplicas.sendTo(
 		Dictionary.values(Dictionary.map(
 			Dictionary.filter(Replicas, function(_Replica)
 				return _Replica.To == "All"
@@ -535,7 +535,7 @@ Replication.getInitialReplicas.listen(function(_, Player)
 	)
 end)
 
-Replication.fireEvent.listen(function(Packet, Player)
+Replication.packets.fireEvent.listen(function(Packet, Player)
 	local _Replica = Replicas[Packet.Id]
 
 	if _Replica then

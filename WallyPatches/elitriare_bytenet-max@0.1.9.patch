@@ -1,0 +1,12 @@
+diff --git a/bytenet-max/src/process/bufferWriter.luau b/bytenet-max/src/process/bufferWriter.luau
+index 228b43d..e267cf8 100644
+--- a/bytenet-max/src/process/bufferWriter.luau
++++ b/bytenet-max/src/process/bufferWriter.luau
+@@ -77,7 +77,6 @@ function bufferWriter.reference(value: any)
+ 
+ 	buffer.writeu8(buff, cursor, index)
+ 	cursor += 1
+-	print(references)
+ end
+ 
+ function bufferWriter.u16(value: number)

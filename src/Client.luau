@@ -181,7 +181,7 @@ local function NewReplicator(Name: string, IsParent: boolean)
 	return self
 end
 
-Replication.createReplica.listen(function(_Replica)
+Replication.packets.createReplica.listen(function(_Replica)
 	local _Replicator = NewReplicator(_Replica.Name, _Replica.IsParent)
 
 	if not Replicas[_Replica.Id] then
@@ -191,7 +191,7 @@ Replication.createReplica.listen(function(_Replica)
 	end
 end)
 
-Replication.destroyReplica.listen(function(Id)
+Replication.packets.destroyReplica.listen(function(Id)
 	local _Replica = Replicas[Id]
 
 	if _Replica then
@@ -204,7 +204,7 @@ Replication.destroyReplica.listen(function(Id)
 	end
 end)
 
-Replication.replicateChanges.listen(function(Data: Types.Packet)
+Replication.packets.replicateChanges.listen(function(Data: Types.Packet)
 	local _Replica = Replicas[Data.Id]
 
 	if _Replica then
@@ -252,7 +252,7 @@ Replication.replicateChanges.listen(function(Data: Types.Packet)
 	end
 end)
 
-Replication.fireEvent.listen(function(Data)
+Replication.packets.fireEvent.listen(function(Data)
 	local _Replica = Replicas[Data.Id]
 
 	if _Replica then
@@ -260,7 +260,7 @@ Replication.fireEvent.listen(function(Data)
 	end
 end)
 
-Replication.getInitialReplicas.listen(function(_Replicas)
+Replication.packets.getInitialReplicas.listen(function(_Replicas)
 	table.sort(_Replicas, function(A, B)
 		return A.IsParent and not B.IsParent
 	end)
@@ -278,7 +278,7 @@ Replication.getInitialReplicas.listen(function(_Replicas)
 	end
 end)
 
-Replication.changeParent.listen(function(Info)
+Replication.packets.changeParent.listen(function(Info)
 	local _Replica = Replicas[Info.Id]
 
 	if _Replica then
@@ -287,7 +287,7 @@ Replication.changeParent.listen(function(Info)
 	end
 end)
 
-Replication.getInitialReplicas.send()
+Replication.packets.getInitialReplicas.send()
 
 --[=[
     @function ListenToNewReplica
