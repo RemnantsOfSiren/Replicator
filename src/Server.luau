@@ -511,28 +511,25 @@ local function NewReplica(Config: Types.Config)
 	return self
 end
 
-Replication.packets.getInitialReplicas.listen(function(_, Player)
-	Replication.packets.getInitialReplicas.sendTo(
-		Dictionary.values(Dictionary.map(
-			Dictionary.filter(Replicas, function(_Replica)
-				return _Replica.To == "All"
-					or (typeof(_Replica.To) == "table" and table.find(_Replica.To, Player))
-					or _Replica.To == Player
-			end),
-			function(_Replica)
-				return {
-					Id = _Replica.Id,
-					Name = _Replica.Name,
-					Tags = _Replica.Tags,
-					Data = if not _Replica.__IsParent then CopyDeep(_Replica.__Data) else nil,
-					Parent = if _Replica.__Parent then _Replica.__Parent.Id else nil,
-					IsParent = _Replica.__IsParent,
-					WriteLib = _Replica.WriteLib,
-				}
-			end
-		)),
-		Player
-	)
+Replication.queries.getInitialReplicas.listen(function(Player)
+	return Dictionary.values(Dictionary.map(
+		Dictionary.filter(Replicas, function(_Replica)
+			return _Replica.To == "All"
+				or (typeof(_Replica.To) == "table" and table.find(_Replica.To, Player))
+				or _Replica.To == Player
+		end),
+		function(_Replica)
+			return {
+				Id = _Replica.Id,
+				Name = _Replica.Name,
+				Tags = _Replica.Tags,
+				Data = if not _Replica.__IsParent then CopyDeep(_Replica.__Data) else nil,
+				Parent = if _Replica.__Parent then _Replica.__Parent.Id else nil,
+				IsParent = _Replica.__IsParent,
+				WriteLib = _Replica.WriteLib,
+			}
+		end
+	))
 end)
 
 Replication.packets.fireEvent.listen(function(Packet, Player)

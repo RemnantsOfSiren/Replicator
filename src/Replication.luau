@@ -17,10 +17,6 @@ return ByteNet.defineNamespace("Replication", function()
 				value = Replica,
 			}),
 
-			getInitialReplicas = ByteNet.definePacket({
-				value = ByteNet.optional(ByteNet.array(Replica)),
-			}),
-
 			replicateChanges = ByteNet.definePacket({
 				value = ByteNet.struct({
 					Id = ByteNet.string,
@@ -57,6 +53,13 @@ return ByteNet.defineNamespace("Replication", function()
 					Args = ByteNet.array(ByteNet.unknown),
 				}),
 			}),
+		},
+
+		queries = {
+			getInitialReplicas = ByteNet.defineQuery({
+				response = ByteNet.optional(ByteNet.array(Replica)),
+				request = ByteNet.nothing,
+			})
 		}
 	}
 end)
