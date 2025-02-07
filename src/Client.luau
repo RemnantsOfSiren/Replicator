@@ -225,6 +225,10 @@ Replication.packets.replicateChanges.listen(function(Data: Types.Packet)
 				local Key = Path[I]
 				_Data = _Data[Key]
 
+				if type(_Data) ~= "table" then
+					Logger("Warn", `Replica ({_Replica.Id}) attempting to index a non table value at key {Key}.`)
+				end
+
 				if not _Data then
 					return
 				end
@@ -243,7 +247,9 @@ Replication.packets.replicateChanges.listen(function(Data: Types.Packet)
 						table.insert(_Data, LastKey :: number, Change.Value)
 					end
 				else
-					_Data[LastKey] = Change.Value
+					pcall(function() 
+						_Data[LastKey] = Change.Value
+					end)
 				end
 
 				_Replica.__Change:Fire(Path, _Data[LastKey], _OldData)
