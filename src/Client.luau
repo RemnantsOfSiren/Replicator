@@ -3,9 +3,9 @@ local Sift = require(script.Parent.Parent.Sift) :: any
 local Trove = require(script.Parent.Parent.Trove) :: any
 local Signal = require(script.Parent.Parent.Signal) :: any
 
+local Net = require(script.Parent.Net.Client)
 local Types = require(script.Parent.Types)
 local Logger = require(script.Parent.Logger)
-local Replication = require(script.Parent.Replication)
 
 local SharedFunctions = require(script.Parent.SharedFunctions)
 
@@ -52,19 +52,19 @@ end
 	@method OnClientEvent
 	@within Replica
 	@client
-	@param Callback (Player: Player, ...any) -> nil
+	@param Callback (...any) -> nil
 	@return { Disconnect: () -> nil }
 
 	Listens for a client event, and fires the callback with the arguments passed.
 ]=]
-function Replica:OnClientEvent(Callback: (Player: Player, ...any) -> nil): { Disconnect: () -> nil }
+function Replica:OnClientEvent(Callback: (...any) -> nil): { Disconnect: () -> nil }
 	return self.__Fired:Connect(Callback)
 end
 
 function Replica:Fire(...)
 	local Args = { ... }
 
-	Replication.fireEvent.send({
+	Net.fireServerEvent.fire({
 		Name = self.Name,
 		Id = self.Id,
 		Args = Args,
@@ -181,7 +181,7 @@ local function NewReplicator(Name: string, IsParent: boolean)
 	return self
 end
 
-Replication.packets.createReplica.listen(function(_Replica)
+Net.createReplica.on(function(_Replica)
 	local _Replicator = NewReplicator(_Replica.Name, _Replica.IsParent)
 
 	if not Replicas[_Replica.Id] then
@@ -191,7 +191,7 @@ Replication.packets.createReplica.listen(function(_Replica)
 	end
 end)
 
-Replication.packets.destroyReplica.listen(function(Id)
+Net.destroyReplica.on(function(Id)
 	local _Replica = Replicas[Id]
 
 	if _Replica then
@@ -204,7 +204,7 @@ Replication.packets.destroyReplica.listen(function(Id)
 	end
 end)
 
-Replication.packets.replicateChanges.listen(function(Data: Types.Packet)
+Net.updateReplica.on(function(Data: Types.Packet)
 	local _Replica = Replicas[Data.Id]
 
 	if _Replica then
@@ -258,7 +258,7 @@ Replication.packets.replicateChanges.listen(function(Data: Types.Packet)
 	end
 end)
 
-Replication.packets.fireEvent.listen(function(Data)
+Net.fireClientEvent.on(function(Data)
 	local _Replica = Replicas[Data.Id]
 
 	if _Replica then
@@ -266,7 +266,7 @@ Replication.packets.fireEvent.listen(function(Data)
 	end
 end)
 
-Replication.packets.changeParent.listen(function(Info)
+Net.changeParent.on(function(Info)
 	local _Replica = Replicas[Info.Id]
 
 	if _Replica then
@@ -276,7 +276,7 @@ Replication.packets.changeParent.listen(function(Info)
 end)
 
 task.defer(function()
-	local _Replicas = Replication.queries.getInitialReplicas.invoke()
+	local _Replicas = Net.getInitialReplicas.invoke()
 	
 	table.sort(_Replicas, function(A, B)
 		return A.IsParent and not B.IsParent
