@@ -1,0 +1,93 @@
+option Casing = Camel
+option ClientOutput = "src/Net/client.luau"
+option ServerOutput = "src/Net/server.luau"
+
+map unknownArray = { [u8]: unknown }
+
+struct replica {
+    Id: string,
+    Name: string,
+    Tags: unknownArray?,
+    Data: unknown?,
+    Parent: string?,
+    WriteLib: Instance?,
+    IsParent: boolean?
+}
+
+struct replicaChange {
+    Time: f64,
+    Path: unknownArray,
+    Value: unknown?,
+}
+
+map arrayOfChanges = {[u8]: replicaChange}
+
+event createReplica {
+    From: Server,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: replica,
+}
+
+event updateReplica {
+    From: Server,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: struct {
+        Id: string,
+        Changes: arrayOfChanges,
+    }
+}
+
+event fireServerEvent {
+    From: Client,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: struct {
+        Id: string,
+        Args: unknownArray,
+    }
+}
+
+event fireClientEvent {
+    From: Server,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: struct {
+        Id: string,
+        Args: unknownArray,
+    }
+}
+
+event changeParent {
+    From: Server,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: struct {
+        Id: string,
+        Parent: string?,
+    }
+}
+
+event destroyReplica {
+    From: Server,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: string,
+}
+
+event replicaWrite {
+    From: Server,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: struct {
+        Id: string,
+        Method: string,
+        Args: unknownArray?,
+    }
+}
+
+function getInitialReplicas {
+    Yield: Coroutine,
+    Return: replica[0..255]
+}

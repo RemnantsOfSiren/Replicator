@@ -5,9 +5,9 @@ local Sift = require(script.Parent.Parent.Sift) :: any
 local Trove = require(script.Parent.Parent.Trove) :: any
 local Signal = require(script.Parent.Parent.Signal) :: any
 
+local Net = require(script.Parent.Net.Server)
 local Types = require(script.Parent.Types)
 local Logger = require(script.Parent.Logger)
-local Replication = require(script.Parent.Replication)
 local SharedFunctions = require(script.Parent.SharedFunctions)
 
 local Array = Sift.Array
@@ -33,7 +33,7 @@ function Replica:Write(Method: string, ...: any)
 	if self.__WriteLib and self.__WriteLib[Method] then
 		local Return = { self.__WriteLib[Method](self, ...) }
 		local Packet = { Method = Method, Args = { ... } }
-		self.__Fire(Replication.packets.replicateWrite, Packet)
+		self.__Fire(Net.replicaWrite, Packet)
 		return unpack(Return)
 	end
 end
@@ -79,7 +79,7 @@ end
 ]=]
 function Replica:Fire(...)
 	local Args = { ... }
-	self.__Fire(Replication.packets.fireEvent, { Args = Args })
+	self.__Fire(Net.fireClientEvent, { Args = Args })
 end
 
 --[=[
@@ -106,7 +106,7 @@ function Replica:SetParent(Parent: Types.ServerReplica)
 	self.__Parent = Parent
 	self.To = Parent.To
 
-	self.__Fire(Replication.packets.changeParent, {
+	self.__Fire(Net.changeParent, {
 		Parent = Parent.Id,
 	})
 end
@@ -127,7 +127,7 @@ function Replica:Destroy()
 
 	Replicas[self.Id] = nil
 
-	Replication.packets.destroyReplica.sendToAll(self.Id)
+	Net.destroyReplica.fireAll(self.Id)
 
 	table.clear(self)
 end
@@ -426,11 +426,11 @@ local function NewReplica(Config: Types.Config)
 		Packet.Id = self.Id
 
 		if Config.To == "All" or not Config.To then
-			Event.sendToAll(Packet)
+			Event.fireAll(Packet)
 		elseif typeof(Config.To) == "table" then
-			Event.sendToList(Packet, Config.To)
+			Event.fireList(Config.To, Packet)
 		else
-			Event.sendTo(Packet, Config.To)
+			Event.fire(Config.To, Packet)
 		end
 	end
 
@@ -484,7 +484,7 @@ local function NewReplica(Config: Types.Config)
 		task.delay(0.1, function()
 			while true do
 				if #Changes > 0 and self.__Ready then
-					self.__Fire(Replication.packets.replicateChanges, {
+					self.__Fire(Net.updateReplica, {
 						Changes = Changes,
 					})
 
@@ -497,7 +497,7 @@ local function NewReplica(Config: Types.Config)
 		true
 	)
 
-	self.__Fire(Replication.packets.createReplica, {
+	self.__Fire(Net.createReplica, {
 		Name = self.Name,
 		Tags = self.Tags,
 		Data = self.__Data and CopyDeep(self.__Data),
@@ -511,7 +511,7 @@ local function NewReplica(Config: Types.Config)
 	return self
 end
 
-Replication.queries.getInitialReplicas.listen(function(Player)
+Net.getInitialReplicas.on(function(Player: Player)
 	return Dictionary.values(Dictionary.map(
 		Dictionary.filter(Replicas, function(_Replica)
 			return _Replica.To == "All"
@@ -532,11 +532,11 @@ Replication.queries.getInitialReplicas.listen(function(Player)
 	))
 end)
 
-Replication.packets.fireEvent.listen(function(Packet, Player)
+Net.fireServerEvent.on(function(Player, Packet)
 	local _Replica = Replicas[Packet.Id]
 
 	if _Replica then
-		_Replica.__Fired:Fire(Player, unpack(Packet.Args))
+		_Replica.__Fired:Fire(Player, if Packet.Args then unpack(Packet.Args) else nil)
 	end
 end)
 
