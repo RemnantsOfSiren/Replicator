@@ -467,18 +467,18 @@ if not RunService:IsServer() then
     error("Server network module can only be required from the server.")
 end
 
-local Reliable: RemoteEvent = ReplicatedStorage:FindFirstChild("BLINK_RELIABLE_REMOTE") :: RemoteEvent
+local Reliable: RemoteEvent = ReplicatedStorage:FindFirstChild("REPLICATOR_RELIABLE_REMOTE") :: RemoteEvent
 if not Reliable then
     local RemoteEvent = Instance.new("RemoteEvent")
-    RemoteEvent.Name = "BLINK_RELIABLE_REMOTE"
+    RemoteEvent.Name = "REPLICATOR_RELIABLE_REMOTE"
     RemoteEvent.Parent = ReplicatedStorage
     Reliable = RemoteEvent
 end
 
-local Unreliable: UnreliableRemoteEvent = ReplicatedStorage:FindFirstChild("BLINK_UNRELIABLE_REMOTE") :: UnreliableRemoteEvent
+local Unreliable: UnreliableRemoteEvent = ReplicatedStorage:FindFirstChild("REPLICATOR_UNRELIABLE_REMOTE") :: UnreliableRemoteEvent
 if not Unreliable then
     local UnreliableRemoteEvent = Instance.new("UnreliableRemoteEvent")
-    UnreliableRemoteEvent.Name = "BLINK_UNRELIABLE_REMOTE"
+    UnreliableRemoteEvent.Name = "REPLICATOR_UNRELIABLE_REMOTE"
     UnreliableRemoteEvent.Parent = ReplicatedStorage
     Unreliable = UnreliableRemoteEvent
 end
