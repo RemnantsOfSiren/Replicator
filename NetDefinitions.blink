@@ -1,6 +1,7 @@
 option Casing = Camel
 option ClientOutput = "src/Net/client.luau"
 option ServerOutput = "src/Net/server.luau"
+option RemoteScope = "REPLICATOR"
 
 map unknownArray = { [u8]: unknown }
 
@@ -20,7 +21,7 @@ struct replicaChange {
     Value: unknown?,
 }
 
-map arrayOfChanges = {[u8]: replicaChange}
+map arrayOfChanges = { [u8]: replicaChange }
 
 event createReplica {
     From: Server,

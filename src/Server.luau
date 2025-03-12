@@ -256,8 +256,8 @@ local function ListenToTable(registerUpdate: (...any) -> nil, Table, Indicies: {
 
 			local Updated = false
 
-			if Sift.Array.is(Table) and Value == nil then
-				Logger("Warn", "Use :Remove() to remove an element from an array.")
+			if Sift.Array.is(Table) then
+				Logger("Warn", if Value == nil then "Use :Remove() to remove an element from an array." else "Use :Insert() to insert an element into an array.")
 				return
 			else
 				local TValue = rawget(Table, Key)

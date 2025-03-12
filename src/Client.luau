@@ -238,7 +238,11 @@ Net.updateReplica.on(function(Data: Types.Packet)
 				local _OldData = CopyDeep(_Replica.Data)
 				local LastKey = Path[#Path]
 
-				if LastKey ~= nil and type(LastKey) == "number" and (Array.is(_Data) or Dictionary.count(_Data) == 0) then
+				if
+					LastKey ~= nil
+					and type(LastKey) == "number"
+					and (Array.is(_Data) or Dictionary.count(_Data) == 0)
+				then
 					if Change.Value == nil then
 						table.remove(_Data, LastKey :: number)
 					elseif _Data[LastKey] then
@@ -247,7 +251,7 @@ Net.updateReplica.on(function(Data: Types.Packet)
 						table.insert(_Data, LastKey :: number, Change.Value)
 					end
 				else
-					pcall(function() 
+					pcall(function()
 						_Data[LastKey] = Change.Value
 					end)
 				end
@@ -277,7 +281,7 @@ end)
 
 task.defer(function()
 	local _Replicas = Net.getInitialReplicas.invoke()
-	
+
 	table.sort(_Replicas, function(A, B)
 		return A.IsParent and not B.IsParent
 	end)
