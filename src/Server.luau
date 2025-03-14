@@ -8,6 +8,7 @@ local Signal = require(script.Parent.Parent.Signal) :: any
 local Net = require(script.Parent.Net.Server)
 local Types = require(script.Parent.Types)
 local Logger = require(script.Parent.Logger)
+local Parser = require(script.Parent.Parser)
 local SharedFunctions = require(script.Parent.SharedFunctions)
 
 local Array = Sift.Array
@@ -59,10 +60,12 @@ end
 
 	Updates the specified path to the provided value.
 ]=]
-function Replica:SetValue(path: { string }, value: any)
+function Replica:SetValue(path: Types.ValidPath, value: any)
+	local parsedPath = Parser(path)
 	local pointer = self.Data
-	for index, key in path do
-		if index == #path then
+	
+	for index, key in parsedPath do
+		if index == #parsedPath then
 			break
 		end
 
@@ -72,7 +75,7 @@ function Replica:SetValue(path: { string }, value: any)
 		end
 	end
 
-	pointer[path[#path]] = value
+	pointer[parsedPath[#parsedPath]] = value
 end
 
 --[=[
