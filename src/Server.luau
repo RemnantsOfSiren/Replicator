@@ -19,6 +19,18 @@ local Replicas = {}
 local Replica = {}
 Replica.__index = Replica
 
+local function CreateReplica(player, replica)
+	Net.createReplica.fire(player, {
+		Id = replica.Id,
+		Name = replica.Name,
+		Tags = replica.Tags,
+		Data = if not replica.__IsParent then CopyDeep(replica.__Data) else nil,
+		Parent = if replica.__Parent then replica.__Parent.Id else nil,
+		IsParent = replica.__IsParent,
+		WriteLib = replica.WriteLib,
+	})
+end
+
 --[=[
     @method Write
     @within Replica
@@ -36,6 +48,31 @@ function Replica:Write(Method: string, ...: any)
 		self.__Fire(Net.replicaWrite, Packet)
 		return unpack(Return)
 	end
+end
+
+--[=[
+    @method SetValue
+    @within Replica
+    @server
+    @param path { string }
+    @param value any
+
+	Updates the specified path to the provided value.
+]=]
+function Replica:SetValue(path: { string }, value: any)
+	local pointer = self.Data
+	for index, key in path do
+		if index == #path then
+			break
+		end
+
+		pointer = pointer[key]
+		if not pointer then
+			return
+		end
+	end
+
+	pointer[path[#path]] = value
 end
 
 --[=[
@@ -112,6 +149,38 @@ function Replica:SetParent(Parent: Types.ServerReplica)
 end
 
 --[=[
+    @method ReplicateFor
+    @within Replica
+    @server
+    @return nil
+
+    Replicates the replica to the specified player.
+    This should only ever be intentionally called from the Server.
+]=]
+function Replica:ReplicateFor(player)
+	-- Ensure player can be replicated to
+	if self.To == "All" then
+		return warn(`Attempt to update replication when To="All".\n{debug.traceback()}`)
+	end
+	if table.find(self.To, player) then
+		return
+	end
+
+	-- Replicate to player
+	if typeof(self.To) == "Instance" then
+		self.To = { self.To }
+	end
+	table.insert(self.To, player)
+
+	-- Replicate main replica to player
+	CreateReplica(player, self)
+	for _, childReplica in self:GetChildren() do
+		childReplica.To = self.To
+		CreateReplica(player, childReplica)
+	end
+end
+
+--[=[
     @method Destroy
     @within Replica
     @server
@@ -128,8 +197,38 @@ function Replica:Destroy()
 	Replicas[self.Id] = nil
 
 	Net.destroyReplica.fireAll(self.Id)
+	for _, childReplica in self:GetChildren() do
+		childReplica.To = self.To
+		Net.destroyReplica.fireAll(childReplica.Id)
+	end
 
 	table.clear(self)
+end
+
+--[=[
+    @method DestroyFor
+    @within Replica
+    @server
+    @return nil
+
+    Destroys the replica for the specified player.
+    This should only ever be intentionally called from the Server.
+]=]
+function Replica:DestroyFor(player)
+	if typeof(self.To) == "Instance" then
+		self.To = nil
+	elseif typeof(self.To) == "table" then
+		local index = table.find(self.To, player)
+		if index then
+			table.remove(self.To, index)
+		end
+	end
+
+	Net.destroyReplica.fire(player, self.Id)
+	for _, childReplica in self:GetChildren() do
+		childReplica.To = self.To
+		Net.destroyReplica.fire(player, childReplica.Id)
+	end
 end
 
 --[=[ 
