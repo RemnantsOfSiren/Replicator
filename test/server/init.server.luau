@@ -9,7 +9,7 @@ local Parent = Replicator.NewReplica({
 
 local Parent2 = Replicator.NewReplica({
     Name = "Parent2",
-    To = nil,
+    To = {},
 })
 
 local Replicas = {}
@@ -27,11 +27,13 @@ end
 
 for _, Replica in ipairs(Replicas) do
     task.delay(10, function() 
+        print("Test 1")
         Replica:Fire("TestEvent", 1, 2, 3)
         Replica.Data.TestArray:Insert({ 10 })
     end)
 
     task.delay(15, function()
+        print("Test 2")
         Replica:SetParent(Parent2)
         Replica.Data.TestArray:Remove(3)
     end)
