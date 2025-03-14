@@ -23,7 +23,7 @@ type Path = { Data }
     @method ListenToKeyRemoved
     @within Replica
     @param Path { string | number } | string
-    @param Callback (...any) -> nil
+    @param Callback (Key: string | number, Value: any) -> nil
     @return RBXScriptConnection
 
     Connects to the Change event and listens for a specific key to be removed. When the key is removed, the callback is fired with the key and the value of the key before it was removed.
@@ -33,7 +33,7 @@ type Path = { Data }
     @method ListenToNewKey
     @within Replica
     @param Path { string | number } | string
-    @param Callback (...any) -> nil
+    @param Callback (Key: string | number, Value: any) -> nil
     @return RBXScriptConnection
 
     Connects to the Change event and listens for a new key to be added. When the key is added, the callback is fired with the key and the value of the key.
@@ -43,7 +43,7 @@ type Path = { Data }
     @method ListenToChange
     @within Replica
     @param Path { string | number } | string
-    @param Callback (...any) -> nil
+    @param Callback (NewValue: any, OldValue: any) -> nil
     @param SuppressOld boolean?
     @return RBXScriptConnection
 
@@ -53,7 +53,7 @@ type Path = { Data }
 --[=[
     @method ListenToRaw
     @within Replica
-    @param Callback (...any) -> nil
+    @param Callback (Path: { string | number }, NewValue: any, OldValue: any) -> nil
     @return RBXScriptConnection
 
     Connects to the Change event and listens for any key to be changed. When a key is changed, the callback is fired with the path, the new value, and the old value.
@@ -63,7 +63,7 @@ type Path = { Data }
     @method ObserveChange
     @within Replica
     @param Path { string | number } | string
-    @param Callback (...any) -> nil
+    @param Callback (Value: any) -> nil
     @return RBXScriptConnection
 
     Observes a specific key and fires the callback with the value of the key. The callback is fired immediately and then whenever the key is changed.

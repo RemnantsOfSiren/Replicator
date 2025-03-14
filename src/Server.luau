@@ -256,8 +256,8 @@ local function ListenToTable(registerUpdate: (...any) -> nil, Table, Indicies: {
 
 			local Updated = false
 
-			if Sift.Array.is(Table) then
-				Logger("Warn", if Value == nil then "Use :Remove() to remove an element from an array." else "Use :Insert() to insert an element into an array.")
+			if Sift.Array.is(Table) and Value == nil then
+				Logger("Warn", "Use :Remove() to remove an element from an array.")
 				return
 			else
 				local TValue = rawget(Table, Key)
@@ -300,7 +300,10 @@ local function ListenToTable(registerUpdate: (...any) -> nil, Table, Indicies: {
 				rawset(self, "Remove", function(_, Index: number)
 					local _Indicies = table.clone(Indicies or {})
 					_Indicies[#_Indicies + 1] = Index
-					table.remove(Table, Index)
+					local _Value = table.remove(Table, Index)
+					if _Value and type(_Value) == "table" then
+						rawset(self, Index, nil)
+					end
 					registerUpdate(_Indicies, nil, OldData)
 					OldData = CopyDeep(Table)
 				end)
@@ -385,7 +388,10 @@ local function ListenToTable(registerUpdate: (...any) -> nil, Table, Indicies: {
 		rawset(Method, "Remove", function(_, Index: number)
 			local _Indicies = table.clone(Indicies or {})
 			_Indicies[#_Indicies + 1] = Index
-			table.remove(Table, Index)
+			local _Value = table.remove(Table, Index)
+			if _Value and type(_Value) == "table" then
+				rawset(Method, Index, nil)
+			end
 			registerUpdate(_Indicies, nil, OldData)
 			OldData = CopyDeep(Table)
 		end)
