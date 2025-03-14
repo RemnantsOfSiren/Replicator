@@ -59,23 +59,25 @@ end
     @param value any
 
 	Updates the specified path to the provided value.
+	-- This isn't the recommended use of the API, and should only be used in cases of backwards compatibility.
+	-- Credit to @Fuse for the backwards compatibility implementation.
 ]=]
 function Replica:SetValue(path: Types.ValidPath, value: any)
-	local parsedPath = Parser(path)
-	local pointer = self.Data
+	local ParsedPath = Parser(path)
+	local Pointer = self.Data
 	
-	for index, key in parsedPath do
-		if index == #parsedPath then
+	for Index, Key in ParsedPath do
+		if Index == #ParsedPath then
 			break
 		end
 
-		pointer = pointer[key]
-		if not pointer then
+		Pointer = Pointer[Key]
+		if not Pointer then
 			return
 		end
 	end
 
-	pointer[parsedPath[#parsedPath]] = value
+	Pointer[ParsedPath[#ParsedPath]] = value
 end
 
 --[=[
@@ -144,7 +146,22 @@ function Replica:SetParent(Parent: Types.ServerReplica)
 	end
 
 	self.__Parent = Parent
+
+	local Previous: any = self.To
 	self.To = Parent.To
+
+	if self.To ~= "All" then
+		if Previous == "All" then
+			Previous = game.Players:GetPlayers()
+		end
+		Previous = type(Previous) == "table" and Previous or { Previous }
+
+		for _, Player in (Previous) do
+			if not table.find(self.To, Player) then
+				self:DestroyFor(Player)
+			end
+		end
+	end
 
 	self.__Fire(Net.changeParent, {
 		Parent = Parent.Id,
@@ -155,12 +172,14 @@ end
     @method ReplicateFor
     @within Replica
     @server
+	@param Player Player
     @return nil
 
     Replicates the replica to the specified player.
     This should only ever be intentionally called from the Server.
+	-- Credit to @Fuse for implementation of this function.
 ]=]
-function Replica:ReplicateFor(player)
+function Replica:ReplicateFor(player: Player)
 	-- Ensure player can be replicated to
 	if self.To == "All" then
 		return warn(`Attempt to update replication when To="All".\n{debug.traceback()}`)
@@ -173,13 +192,17 @@ function Replica:ReplicateFor(player)
 	if typeof(self.To) == "Instance" then
 		self.To = { self.To }
 	end
+
 	table.insert(self.To, player)
 
 	-- Replicate main replica to player
 	CreateReplica(player, self)
-	for _, childReplica in self:GetChildren() do
-		childReplica.To = self.To
-		CreateReplica(player, childReplica)
+
+	if self.__IsParent then
+		for _, ChildReplica in self:GetChildren() do
+			ChildReplica.To = self.To
+			CreateReplica(player, ChildReplica)
+		end
 	end
 end
 
@@ -200,9 +223,12 @@ function Replica:Destroy()
 	Replicas[self.Id] = nil
 
 	Net.destroyReplica.fireAll(self.Id)
-	for _, childReplica in self:GetChildren() do
-		childReplica.To = self.To
-		Net.destroyReplica.fireAll(childReplica.Id)
+
+	if self.__IsParent then
+		for _, ChildReplica in self:GetChildren() do
+			ChildReplica.To = self.To
+			Net.destroyReplica.fireAll(ChildReplica.Id)
+		end
 	end
 
 	table.clear(self)
@@ -216,21 +242,25 @@ end
 
     Destroys the replica for the specified player.
     This should only ever be intentionally called from the Server.
+	-- Credit to @Fuse for implementation of this function.
 ]=]
-function Replica:DestroyFor(player)
+function Replica:DestroyFor(Player: Player)
 	if typeof(self.To) == "Instance" then
 		self.To = nil
 	elseif typeof(self.To) == "table" then
-		local index = table.find(self.To, player)
+		local index = table.find(self.To, Player)
 		if index then
 			table.remove(self.To, index)
 		end
 	end
 
-	Net.destroyReplica.fire(player, self.Id)
-	for _, childReplica in self:GetChildren() do
-		childReplica.To = self.To
-		Net.destroyReplica.fire(player, childReplica.Id)
+	Net.destroyReplica.fire(Player, self.Id)
+
+	if self.__IsParent then
+		for _, ChildReplica in self:GetChildren() do
+			ChildReplica.To = self.To
+			Net.destroyReplica.fire(Player, ChildReplica.Id)
+		end
 	end
 end
 
@@ -328,7 +358,7 @@ end
 
 local ValidKeyTypes = { "string", "number" }
 
-local function ListenToTable(registerUpdate: (...any) -> nil, Table, Indicies: { [number]: any }?)
+local function ListenToTable(RegisterUpdate: (...any) -> nil, Table, Indicies: { [number]: any }?)
 	local OldData = CopyDeep(Table)
 
 	local Method = setmetatable({
@@ -376,12 +406,12 @@ local function ListenToTable(registerUpdate: (...any) -> nil, Table, Indicies: {
 			_Indicies[#_Indicies + 1] = Key
 
 			if Updated then
-				registerUpdate(_Indicies, if IsTable then CopyDeep(Value) else Value, OldData)
+				RegisterUpdate(_Indicies, if IsTable then CopyDeep(Value) else Value, OldData)
 				OldData = CopyDeep(Table)
 			end
 
 			if IsTable then
-				rawset(self.__value, Key, ListenToTable(registerUpdate, Value, _Indicies))
+				rawset(self.__value, Key, ListenToTable(RegisterUpdate, Value, _Indicies))
 			end
 
 			if (Sift.Array.is(Table) or Sift.Dictionary.count(Table) == 0) and not rawget(self, "Insert") then
@@ -393,9 +423,9 @@ local function ListenToTable(registerUpdate: (...any) -> nil, Table, Indicies: {
 					InsertIndices[#InsertIndices + 1] = Index
 					table.insert(Table, Index, _Value)
 					if _Value and type(_Value) == "table" then
-						rawset(self, Index, ListenToTable(registerUpdate, _Value, InsertIndices))
+						rawset(self, Index, ListenToTable(RegisterUpdate, _Value, InsertIndices))
 					end
-					registerUpdate(InsertIndices, _Value, OldData)
+					RegisterUpdate(InsertIndices, _Value, OldData)
 					OldData = CopyDeep(Table)
 				end)
 				rawset(self, "insert", rawget(self, "Insert"))
@@ -406,7 +436,7 @@ local function ListenToTable(registerUpdate: (...any) -> nil, Table, Indicies: {
 					if _Value and type(_Value) == "table" then
 						rawset(self, Index, nil)
 					end
-					registerUpdate(_Indicies, nil, OldData)
+					RegisterUpdate(_Indicies, nil, OldData)
 					OldData = CopyDeep(Table)
 				end)
 				rawset(self, "remove", rawget(self, "Remove"))
@@ -429,7 +459,7 @@ local function ListenToTable(registerUpdate: (...any) -> nil, Table, Indicies: {
 						local _Indicies = table.clone(Indicies or {})
 						_Indicies[#_Indicies + 1] = Index
 						Value = if type(Value) == "table"
-							then ListenToTable(registerUpdate, Value, _Indicies)
+							then ListenToTable(RegisterUpdate, Value, _Indicies)
 							else Value
 
 						return Index,
@@ -481,9 +511,9 @@ local function ListenToTable(registerUpdate: (...any) -> nil, Table, Indicies: {
 			InsertIndices[#InsertIndices + 1] = Index
 			table.insert(Table, Index, _Value)
 			if _Value and type(_Value) == "table" then
-				rawset(Method, Index, ListenToTable(registerUpdate, _Value, InsertIndices))
+				rawset(Method, Index, ListenToTable(RegisterUpdate, _Value, InsertIndices))
 			end
-			registerUpdate(InsertIndices, _Value, OldData)
+			RegisterUpdate(InsertIndices, _Value, OldData)
 			OldData = CopyDeep(Table)
 		end)
 		rawset(Method, "insert", rawget(Method, "Insert"))
@@ -494,7 +524,7 @@ local function ListenToTable(registerUpdate: (...any) -> nil, Table, Indicies: {
 			if _Value and type(_Value) == "table" then
 				rawset(Method, Index, nil)
 			end
-			registerUpdate(_Indicies, nil, OldData)
+			RegisterUpdate(_Indicies, nil, OldData)
 			OldData = CopyDeep(Table)
 		end)
 		rawset(Method, "remove", rawget(Method, "Remove"))
@@ -554,7 +584,7 @@ local function NewReplica(Config: Types.Config)
 
 	local Changes = {} :: { { Time: number, Path: { string | number }, Value: any } }
 
-	local function registerUpdate(Path, Value, OldData)
+	local function RegisterUpdate(Path, Value, OldData)
 		self.__Change:Fire(Path, Value, self.__OldData)
 		self.__OldData = CopyDeep(OldData)
 
@@ -574,7 +604,7 @@ local function NewReplica(Config: Types.Config)
 	if Config.Data and not self.__IsParent then
 		self.__Data = Config.Data
 		self.__OldData = CopyDeep(self.__Data)
-		self.Data = ListenToTable(registerUpdate, self.__Data)
+		self.Data = ListenToTable(RegisterUpdate, self.__Data)
 	end
 
 	if
