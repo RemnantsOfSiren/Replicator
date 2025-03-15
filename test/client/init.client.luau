@@ -1,6 +1,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Replicator = require(ReplicatedStorage.Packages.Replicator) :: { any }
+local Replicator = require(ReplicatedStorage.Packages.Replicator).Client
 
 for i = 1, 20 do
     task.spawn(function()
@@ -12,6 +12,10 @@ for i = 1, 20 do
             end)       
             Replica:ListenToChange("TestArray", function(Value, OldValue)
                 print("NewValue:", Value, "OldValue:", OldValue)
+            end)
+
+            task.delay(10, function()
+                Replica:Fire("TestEvent", 1, 2, 3)
             end)
         end)
     end)
