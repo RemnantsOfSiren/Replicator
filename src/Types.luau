@@ -52,6 +52,7 @@ export type ServerReplica = Replica & {
 	__Ready: boolean?,
 	__Changes: { [any]: any },
 	__IsParent: boolean?,
+	__ReplicateToChanged: (self: ServerReplica, New: any, Old: any) -> nil,
 
 	To: ToOptions?,
 	Parent: ServerReplica?,
@@ -78,7 +79,6 @@ export type Packet = {
 }
 
 export type Config = {
-	To: ToOptions?,
 	Name: string,
 	Tags: { any }?,
 	Data: { [string | number]: any }?,
@@ -87,10 +87,12 @@ export type Config = {
 }
 
 export type ServerConfig = Config & {
+	To: ToOptions,
 	Parent: ServerReplica?,
 }
 
 export type ClientConfig = Config & {
+	Id: string,
 	Parent: ClientReplica?,
 }
 

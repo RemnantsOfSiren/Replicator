@@ -45,6 +45,13 @@ for _, Replica in ipairs(Replicas) do
         Replica:SetParent(Parent2)
         Replica.Data.TestArray:Remove(3)
     end)
+
+    Replica:AddCleanupMethod(task.spawn(function()
+        while true do
+            Replica.Data.TestArray[1] = { 2 }
+            task.wait()
+        end
+    end), true)
 end
 
 task.delay(16, function() 

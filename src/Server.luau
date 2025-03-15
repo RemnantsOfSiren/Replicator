@@ -1,6 +1,5 @@
 --!strict
 local Sift = require(script.Parent.Parent.Sift) :: any
-local Trove = require(script.Parent.Parent.Trove) :: any
 local Signal = require(script.Parent.Parent.Signal) :: any
 
 local Net = require(script.Parent.Net.Server)
@@ -527,7 +526,7 @@ local function ListenToTable(RegisterUpdate: (...any) -> nil, Table, Indicies: {
 	return Method
 end
 
-export type ServerReplica = typeof(setmetatable({} :: Types.ServerReplica, Replica))
+export type ServerReplica = Replica.Replica & typeof(setmetatable({} :: Types.ServerReplica, ServerReplica))
 
 local function NewReplica(Config: Types.ServerConfig): ServerReplica
 	local Parent: Types.ServerReplica? = Config.Parent :: Types.ServerReplica?
@@ -539,8 +538,6 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 	end
 
 	local self = setmetatable(Replica.new(Config), ServerReplica)
-
-	self.__Changes = {}
 
 	self.__ReplicateToChanged = Signal.new()
 	
@@ -570,6 +567,8 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 		end
 	end)
 
+	local Changes = {}
+
 	self.__Fire = function(Event, Packet)
 		Packet.Id = self.Id
 
@@ -586,8 +585,8 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 		self.__Change:Fire(Path, Value, self.__OldData)
 		self.__OldData = CopyDeep(OldData)
 
-		local Found = Array.findWhere(self.__Changes, function(Change)
-			return Path == Change.Path
+		local Found = Array.findWhere(Changes, function(ChangeInfo)
+			return Path == ChangeInfo.Path
 		end)
 
 		if Found and os.clock() > Found.Time then
@@ -596,7 +595,7 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 			return
 		end
 
-		table.insert(self.__Changes, { Time = os.clock(), Path = Path, Value = Value })
+		table.insert(Changes, { Time = os.clock(), Path = Path, Value = Value })
 	end
 
 	if Config.Data then
@@ -625,6 +624,21 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 
 	self.__Ready = true
 	Replicas[self.Id] = self
+
+	self:AddCleanupMethod(task.spawn(function()
+		while true do
+			if self.__Ready and #Changes > 0 then
+				self.__Fire(Net.updateReplica, {
+					Id = self.Id,
+					Changes = Changes,
+				})
+			end
+
+			table.clear(Changes)
+
+			task.wait(.1)
+		end
+	end), true)
 
 	return self
 end
@@ -658,22 +672,12 @@ Net.fireServerEvent.on(function(Player, Packet)
 	end
 end)
 
-task.spawn(function()
-	while true do
-		for _, _Replica in pairs(Replicas) do
-			local Changes = _Replica.__Changes
-
-			if #Changes > 0 and _Replica.__Ready then
-				_Replica.__Fire(Net.updateReplica, {
-					Changes = Changes,
-				})
-
-				table.clear(Changes)
-			end
-		end
-
-		task.wait()
+game:BindToClose(function()
+	for _, _Replica in pairs(Replicas) do
+		task.defer(_Replica.Destroy, _Replica)
 	end
+
+	table.clear(Replicas)
 end)
 
 --[=[

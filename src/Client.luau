@@ -75,17 +75,9 @@ function ClientReplica:Destroy()
 	table.clear(self)
 end
 
-export type ClientReplica = typeof(setmetatable({} :: Types.ClientReplica, ClientReplica))
+export type ClientReplica = Replica.Replica & typeof(setmetatable({} :: Types.ClientReplica, ClientReplica))
 
-local function NewReplica(Config: {
-	Id: string,
-	Name: string,
-	Tags: { any }?,
-	Data: any?,
-	WriteLib: Instance?,
-	Parent: string?,
-	IsParent: boolean?,
-}): ClientReplica
+local function NewReplica(Config: Types.ClientConfig): ClientReplica
 	if Config.WriteLib and not Config.WriteLib:IsA("ModuleScript") then
 		return Logger("Warn", "WriteLib must be a ModuleScript.")
 	end
@@ -205,25 +197,28 @@ Net.updateReplica.on(function(Data: Types.Packet)
 				end
 			end
 
+			
 			if _Data then
 				local _OldData = CopyDeep(_Replica.Data)
 				local LastKey = Path[#Path]
+
+				local Value = Change.Value
 
 				if
 					LastKey ~= nil
 					and type(LastKey) == "number"
 					and (Array.is(_Data) or Dictionary.count(_Data) == 0)
 				then
-					if Change.Value == nil then
+					if Value == nil then
 						table.remove(_Data, LastKey :: number)
 					elseif _Data[LastKey] then
-						_Data[LastKey] = Change.Value
+						_Data[LastKey] = Value
 					else
-						table.insert(_Data, LastKey :: number, Change.Value)
+						table.insert(_Data, LastKey :: number, Value)
 					end
 				else
 					pcall(function()
-						_Data[LastKey] = Change.Value
+						_Data[LastKey] = Value
 					end)
 				end
 
