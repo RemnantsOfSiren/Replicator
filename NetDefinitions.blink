@@ -8,7 +8,7 @@ map unknownArray = { [u8]: unknown }
 struct replica {
     Id: string,
     Name: string,
-    Tags: unknownArray?,
+    Tags: unknown?,
     Data: unknown?,
     Parent: string?,
     WriteLib: Instance?,
