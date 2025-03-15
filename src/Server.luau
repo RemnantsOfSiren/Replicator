@@ -183,6 +183,7 @@ function Replica:ReplicateFor(player: Player)
 	if self.To == "All" then
 		return warn(`Attempt to update replication when To="All".\n{debug.traceback()}`)
 	end
+	
 	if table.find(self.To, player) then
 		return
 	end
@@ -244,6 +245,10 @@ end
 	-- Credit to @Fuse for implementation of this function.
 ]=]
 function Replica:DestroyFor(Player: Player)
+	if self.To == "All" then
+		return warn(`Attempt to destroy replication for {Player} when To="All".\n{debug.traceback()}`)
+	end
+
 	if typeof(self.To) == "Instance" then
 		self.To = nil
 	elseif typeof(self.To) == "table" then
