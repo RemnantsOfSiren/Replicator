@@ -27,127 +27,127 @@ local RecieveInstanceCursor = 0
 local Null = newproxy()
 
 type Entry = {
-    value: any,
-    next: Entry?
+	value: any,
+	next: Entry?,
 }
 
 type Queue = {
-    head: Entry?,
-    tail: Entry?
+	head: Entry?,
+	tail: Entry?,
 }
 
 type BufferSave = {
-    Size: number, 
-    Cursor: number, 
-    Buffer: buffer, 
-    Instances: {Instance}
+	Size: number,
+	Cursor: number,
+	Buffer: buffer,
+	Instances: { Instance },
 }
 
 local function Read(Bytes: number)
-    local Offset = RecieveCursor
-    RecieveCursor += Bytes
-    return Offset
+	local Offset = RecieveCursor
+	RecieveCursor += Bytes
+	return Offset
 end
 
 local function Save(): BufferSave
-    return {
-        Size = SendSize,
-        Cursor = SendCursor,
-        Buffer = SendBuffer,
-        Instances = SendInstances
-    }
+	return {
+		Size = SendSize,
+		Cursor = SendCursor,
+		Buffer = SendBuffer,
+		Instances = SendInstances,
+	}
 end
 
 local function Load(Save: BufferSave?)
-    if Save then
-        SendSize = Save.Size
-        SendCursor = Save.Cursor
-        SendOffset = Save.Cursor
-        SendBuffer = Save.Buffer
-        SendInstances = Save.Instances
-        return
-    end
+	if Save then
+		SendSize = Save.Size
+		SendCursor = Save.Cursor
+		SendOffset = Save.Cursor
+		SendBuffer = Save.Buffer
+		SendInstances = Save.Instances
+		return
+	end
 
-    SendSize = 64
-    SendCursor = 0
-    SendOffset = 0
-    SendBuffer = buffer.create(64)
-    SendInstances = {}
+	SendSize = 64
+	SendCursor = 0
+	SendOffset = 0
+	SendBuffer = buffer.create(64)
+	SendInstances = {}
 end
 
 local function Invoke()
-    if Invocations == 255 then
-        Invocations = 0
-    end
+	if Invocations == 255 then
+		Invocations = 0
+	end
 
-    local Invocation = Invocations
-    Invocations += 1
-    return Invocation
+	local Invocation = Invocations
+	Invocations += 1
+	return Invocation
 end
 
 local function Allocate(Bytes: number)
-    local InUse = (SendCursor + Bytes)
-    if InUse > SendSize then
-        --> Avoid resizing the buffer for every write
-        while InUse > SendSize do
-            SendSize *= 1.5
-        end
+	local InUse = (SendCursor + Bytes)
+	if InUse > SendSize then
+		--> Avoid resizing the buffer for every write
+		while InUse > SendSize do
+			SendSize *= 1.5
+		end
 
-        local Buffer = buffer.create(SendSize)
-        buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
-        SendBuffer = Buffer
-    end
+		local Buffer = buffer.create(SendSize)
+		buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
+		SendBuffer = Buffer
+	end
 
-    SendOffset = SendCursor
-    SendCursor += Bytes
-    
-    return SendOffset
+	SendOffset = SendCursor
+	SendCursor += Bytes
+
+	return SendOffset
 end
 
 local function CreateQueue(): Queue
-    return {
-        head = nil,
-        tail = nil
-    }
+	return {
+		head = nil,
+		tail = nil,
+	}
 end
 
 local function Pop(queue: Queue): any
-    local head = queue.head
-    if head == nil then
-        return
-    end
+	local head = queue.head
+	if head == nil then
+		return
+	end
 
-    queue.head = head.next
-    return head.value
+	queue.head = head.next
+	return head.value
 end
 
 local function Push(queue: Queue, value: any)
-    local entry: Entry = {
-        value = value,
-        next = nil
-    }
+	local entry: Entry = {
+		value = value,
+		next = nil,
+	}
 
-    if queue.tail ~= nil then
-        queue.tail.next = entry
-    end
+	if queue.tail ~= nil then
+		queue.tail.next = entry
+	end
 
-    queue.tail = entry
+	queue.tail = entry
 
-    if queue.head == nil then
-        queue.head = entry
-    end
+	if queue.head == nil then
+		queue.head = entry
+	end
 end
 
 local Calls = table.create(256)
 
 local Events: any = {
-    Reliable = table.create(256),
-    Unreliable = table.create(256)
+	Reliable = table.create(256),
+	Unreliable = table.create(256),
 }
 
 local Queue: any = {
-    Reliable = table.create(256),
-    Unreliable = table.create(256)
+	Reliable = table.create(256),
+	Unreliable = table.create(256),
 }
 
 Queue.Reliable[0] = table.create(256)
@@ -157,11 +157,27 @@ Queue.Reliable[4] = table.create(256)
 Queue.Reliable[5] = table.create(256)
 Queue.Reliable[6] = table.create(256)
 Queue.Reliable[7] = table.create(256)
-export type unknownArray = {[number]: any}
-export type replica = { Id: string, Name: string, Tags: {[number]: any}?, Data: any?, Parent: string?, WriteLib: Instance?, IsParent: boolean? }
-export type replicaChange = { Time: number, Path: {[number]: any}, Value: any? }
-export type arrayOfChanges = {[number]: { Time: number, Path: {[number]: any}, Value: any? }}
-local function ReadEVENT_createReplica(): ({ Id: string, Name: string, Tags: {[number]: any}?, Data: any?, Parent: string?, WriteLib: Instance?, IsParent: boolean? })
+export type unknownArray = { [number]: any }
+export type replica = {
+	Id: string,
+	Name: string,
+	Tags: { [number]: any }?,
+	Data: any?,
+	Parent: string?,
+	WriteLib: Instance?,
+	IsParent: boolean?,
+}
+export type replicaChange = { Time: number, Path: { [number]: any }, Value: any? }
+export type arrayOfChanges = { [number]: { Time: number, Path: { [number]: any }, Value: any? } }
+local function ReadEVENT_createReplica(): {
+	Id: string,
+	Name: string,
+	Tags: { [number]: any }?,
+	Data: any?,
+	Parent: string?,
+	WriteLib: Instance?,
+	IsParent: boolean?,
+}
 	-- Read BLOCK: 8 bytes
 	local BLOCK_START = Read(8)
 	local Value = {} :: any
@@ -197,8 +213,12 @@ local function ReadEVENT_createReplica(): ({ Id: string, Name: string, Tags: {[n
 		RecieveInstanceCursor -= 1
 		RecieveInstanceCursor += 1
 		Value.WriteLib = RecieveInstances[RecieveInstanceCursor]
-		if typeof(Value.WriteLib) ~= "Instance" then error(`Expected an Instance, got {typeof(Value.WriteLib)} instead.`) end
-		if not Value.WriteLib:IsA("Instance") then error(`Expected an Instance of type "Instance", got "{Value.WriteLib.ClassName}" instead.`) end
+		if typeof(Value.WriteLib) ~= "Instance" then
+			error(`Expected an Instance, got {typeof(Value.WriteLib)} instead.`)
+		end
+		if not Value.WriteLib:IsA("Instance") then
+			error(`Expected an Instance of type "Instance", got "{Value.WriteLib.ClassName}" instead.`)
+		end
 	end
 	if buffer.readu8(RecieveBuffer, BLOCK_START + 7) == 1 then
 		-- Read BLOCK: 1 bytes
@@ -208,7 +228,10 @@ local function ReadEVENT_createReplica(): ({ Id: string, Name: string, Tags: {[n
 	return Value
 end
 
-local function ReadEVENT_updateReplica(): ({ Id: string, Changes: {[number]: { Time: number, Path: {[number]: any}, Value: any? }} })
+local function ReadEVENT_updateReplica(): {
+	Id: string,
+	Changes: { [number]: { Time: number, Path: { [number]: any }, Value: any? } },
+}
 	-- Read BLOCK: 4 bytes
 	local BLOCK_START = Read(4)
 	local Value = {} :: any
@@ -242,7 +265,7 @@ local function ReadEVENT_updateReplica(): ({ Id: string, Changes: {[number]: { T
 	return Value
 end
 
-local function WriteEVENT_fireServerEvent(Value: { Id: string, Args: {[number]: any} }): ()
+local function WriteEVENT_fireServerEvent(Value: { Id: string, Args: { [number]: any } }): ()
 	-- Allocate BLOCK: 5 bytes
 	local BLOCK_START = Allocate(5)
 	buffer.writeu8(SendBuffer, BLOCK_START + 0, 2)
@@ -260,7 +283,7 @@ local function WriteEVENT_fireServerEvent(Value: { Id: string, Args: {[number]: 
 	buffer.writeu16(SendBuffer, BLOCK_START + 3, Elements_1)
 end
 
-local function ReadEVENT_fireClientEvent(): ({ Id: string, Args: {[number]: any} })
+local function ReadEVENT_fireClientEvent(): { Id: string, Args: { [number]: any } }
 	-- Read BLOCK: 4 bytes
 	local BLOCK_START = Read(4)
 	local Value = {} :: any
@@ -278,7 +301,7 @@ local function ReadEVENT_fireClientEvent(): ({ Id: string, Args: {[number]: any}
 	return Value
 end
 
-local function ReadEVENT_changeParent(): ({ Id: string, Parent: string? })
+local function ReadEVENT_changeParent(): { Id: string, Parent: string? }
 	-- Read BLOCK: 3 bytes
 	local BLOCK_START = Read(3)
 	local Value = {} :: any
@@ -293,7 +316,7 @@ local function ReadEVENT_changeParent(): ({ Id: string, Parent: string? })
 	return Value
 end
 
-local function ReadEVENT_destroyReplica(): (string)
+local function ReadEVENT_destroyReplica(): string
 	-- Read BLOCK: 2 bytes
 	local BLOCK_START = Read(2)
 	local Length = buffer.readu16(RecieveBuffer, BLOCK_START + 0)
@@ -301,7 +324,7 @@ local function ReadEVENT_destroyReplica(): (string)
 	return Value
 end
 
-local function ReadEVENT_replicaWrite(): ({ Id: string, Method: string, Args: {[number]: any}? })
+local function ReadEVENT_replicaWrite(): { Id: string, Method: string, Args: { [number]: any }? }
 	-- Read BLOCK: 5 bytes
 	local BLOCK_START = Read(5)
 	local Value = {} :: any
@@ -332,7 +355,17 @@ local function WriteFUNCTION_DATA_getInitialReplicas(Value: nil, InvocationIdent
 	buffer.writeu8(SendBuffer, BLOCK_START + 1, InvocationIdentifier)
 end
 
-local function ReadFUNCTION_RETURN_getInitialReplicas(): ({ { Id: string, Name: string, Tags: {[number]: any}?, Data: any?, Parent: string?, WriteLib: Instance?, IsParent: boolean? } })
+local function ReadFUNCTION_RETURN_getInitialReplicas(): {
+	{
+		Id: string,
+		Name: string,
+		Tags: { [number]: any }?,
+		Data: any?,
+		Parent: string?,
+		WriteLib: Instance?,
+		IsParent: boolean?,
+	}
+}
 	-- Read BLOCK: 2 bytes
 	local BLOCK_START = Read(2)
 	local Success = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
@@ -341,10 +374,14 @@ local function ReadFUNCTION_RETURN_getInitialReplicas(): ({ { Id: string, Name: 
 	end
 	-- START ARRAY
 	local Length = buffer.readu8(RecieveBuffer, BLOCK_START + 1)
-	if Length < 0 then error(`Expected "Length" to be larger than 0, got {Length} instead.`) end
-	if Length > 255 then error(`Expected "Length" to be smaller than 255, got {Length} instead.`) end
+	if Length < 0 then
+		error(`Expected "Length" to be larger than 0, got {Length} instead.`)
+	end
+	if Length > 255 then
+		error(`Expected "Length" to be smaller than 255, got {Length} instead.`)
+	end
 	local Value = table.create(Length)
-		-- Read BLOCK: 8 bytes
+	-- Read BLOCK: 8 bytes
 	local ARRAY_START_1 = Read(8 * Length)
 	for Index = 1, Length do
 		local Item_1 = {} :: any
@@ -395,8 +432,12 @@ local function ReadFUNCTION_RETURN_getInitialReplicas(): ({ { Id: string, Name: 
 			RecieveInstanceCursor -= 1
 			RecieveInstanceCursor += 1
 			Item_1.WriteLib = RecieveInstances[RecieveInstanceCursor]
-			if typeof(Item_1.WriteLib) ~= "Instance" then error(`Expected an Instance, got {typeof(Item_1.WriteLib)} instead.`) end
-			if not Item_1.WriteLib:IsA("Instance") then error(`Expected an Instance of type "Instance", got "{Item_1.WriteLib.ClassName}" instead.`) end
+			if typeof(Item_1.WriteLib) ~= "Instance" then
+				error(`Expected an Instance, got {typeof(Item_1.WriteLib)} instead.`)
+			end
+			if not Item_1.WriteLib:IsA("Instance") then
+				error(`Expected an Instance of type "Instance", got "{Item_1.WriteLib.ClassName}" instead.`)
+			end
 		end
 		-- Read 1
 		local OPERATION_OFFSET = ARRAY_START_1
@@ -415,55 +456,56 @@ end
 if not RunService:IsRunning() then
 	local NOOP = function() end
 	local Returns = table.freeze({
-	createReplica = {
-		on = NOOP
-	},
-	updateReplica = {
-		on = NOOP
-	},
-	fireServerEvent = {
-		fire = NOOP
-	},
-	fireClientEvent = {
-		on = NOOP
-	},
-	changeParent = {
-		on = NOOP
-	},
-	destroyReplica = {
-		on = NOOP
-	},
-	replicaWrite = {
-		on = NOOP
-	},
-	getInitialReplicas = {
-		invoke = NOOP
-	},
+		createReplica = {
+			on = NOOP,
+		},
+		updateReplica = {
+			on = NOOP,
+		},
+		fireServerEvent = {
+			fire = NOOP,
+		},
+		fireClientEvent = {
+			on = NOOP,
+		},
+		changeParent = {
+			on = NOOP,
+		},
+		destroyReplica = {
+			on = NOOP,
+		},
+		replicaWrite = {
+			on = NOOP,
+		},
+		getInitialReplicas = {
+			invoke = NOOP,
+		},
 	})
 	return Returns :: BLINK_EVENTS_SYMBOL
 end
 
 if not RunService:IsClient() then
-    error("Client network module can only be required from the client.")
+	error("Client network module can only be required from the client.")
 end
 
 local Reliable: RemoteEvent = ReplicatedStorage:WaitForChild(BASE_EVENT_NAME .. "_RELIABLE_REMOTE") :: RemoteEvent
-local Unreliable: UnreliableRemoteEvent = ReplicatedStorage:WaitForChild(BASE_EVENT_NAME .. "_UNRELIABLE_REMOTE") :: UnreliableRemoteEvent
+local Unreliable: UnreliableRemoteEvent =
+	ReplicatedStorage:WaitForChild(BASE_EVENT_NAME .. "_UNRELIABLE_REMOTE") :: UnreliableRemoteEvent
 
 local function StepReplication()
-    if SendCursor <= 0 then
-        return
-    end
+	if SendCursor <= 0 then
+		return
+	end
 
-    local Buffer = buffer.create(SendCursor)
-    buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
-    Reliable:FireServer(Buffer, SendInstances)
+	local Buffer = buffer.create(SendCursor)
+	buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
+	Reliable:FireServer(Buffer, SendInstances)
 
-    SendSize = 64
-    SendCursor = 0
-    SendOffset = 0
-    SendBuffer = buffer.create(64)
-    table.clear(SendInstances)
+	SendSize = 64
+	SendCursor = 0
+	SendOffset = 0
+	SendBuffer = buffer.create(64)
+	table.clear(SendInstances)
 end
 local Elapsed = 0
 RunService.Heartbeat:Connect(function(DeltaTime: number)
@@ -473,45 +515,61 @@ RunService.Heartbeat:Connect(function(DeltaTime: number)
 		StepReplication()
 	end
 end)
-Reliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: {Instance})
+Reliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: { Instance })
 	RecieveCursor = 0
 	RecieveBuffer = Buffer
 	RecieveInstances = Instances
 	RecieveInstanceCursor = 0
 	local Size = buffer.len(RecieveBuffer)
-	while (RecieveCursor < Size) do
+	while RecieveCursor < Size do
 		-- Read BLOCK: 1 bytes
 		local BLOCK_START = Read(1)
 		local Index = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
 		if Index == 0 then
-			local Value: { Id: string, Name: string, Tags: {[number]: any}?, Data: any?, Parent: string?, WriteLib: Instance?, IsParent: boolean? } = ReadEVENT_createReplica()
+			local Value: {
+				Id: string,
+				Name: string,
+				Tags: { [number]: any }?,
+				Data: any?,
+				Parent: string?,
+				WriteLib: Instance?,
+				IsParent: boolean?,
+			} =
+				ReadEVENT_createReplica()
 			if Events.Reliable[0] ~= nil then
 				Events.Reliable[0](Value)
 			else
 				if #Queue.Reliable[0] > 256 then
-					warn("[Blink]: Event queue of \"createReplica\" exceeded 256, did you forget to implement a listener?")
+					warn(
+						'[Blink]: Event queue of "createReplica" exceeded 256, did you forget to implement a listener?'
+					)
 				end
-				table.insert(Queue.Reliable[0], {Value} :: {any})
+				table.insert(Queue.Reliable[0], { Value } :: { any })
 			end
 		elseif Index == 1 then
-			local Value: { Id: string, Changes: {[number]: { Time: number, Path: {[number]: any}, Value: any? }} } = ReadEVENT_updateReplica()
+			local Value: { Id: string, Changes: { [number]: { Time: number, Path: { [number]: any }, Value: any? } } } =
+				ReadEVENT_updateReplica()
 			if Events.Reliable[1] ~= nil then
 				Events.Reliable[1](Value)
 			else
 				if #Queue.Reliable[1] > 256 then
-					warn("[Blink]: Event queue of \"updateReplica\" exceeded 256, did you forget to implement a listener?")
+					warn(
+						'[Blink]: Event queue of "updateReplica" exceeded 256, did you forget to implement a listener?'
+					)
 				end
-				table.insert(Queue.Reliable[1], {Value} :: {any})
+				table.insert(Queue.Reliable[1], { Value } :: { any })
 			end
 		elseif Index == 3 then
-			local Value: { Id: string, Args: {[number]: any} } = ReadEVENT_fireClientEvent()
+			local Value: { Id: string, Args: { [number]: any } } = ReadEVENT_fireClientEvent()
 			if Events.Reliable[3] ~= nil then
 				Events.Reliable[3](Value)
 			else
 				if #Queue.Reliable[3] > 256 then
-					warn("[Blink]: Event queue of \"fireClientEvent\" exceeded 256, did you forget to implement a listener?")
+					warn(
+						'[Blink]: Event queue of "fireClientEvent" exceeded 256, did you forget to implement a listener?'
+					)
 				end
-				table.insert(Queue.Reliable[3], {Value} :: {any})
+				table.insert(Queue.Reliable[3], { Value } :: { any })
 			end
 		elseif Index == 4 then
 			local Value: { Id: string, Parent: string? } = ReadEVENT_changeParent()
@@ -519,9 +577,9 @@ Reliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: {Instance})
 				Events.Reliable[4](Value)
 			else
 				if #Queue.Reliable[4] > 256 then
-					warn("[Blink]: Event queue of \"changeParent\" exceeded 256, did you forget to implement a listener?")
+					warn('[Blink]: Event queue of "changeParent" exceeded 256, did you forget to implement a listener?')
 				end
-				table.insert(Queue.Reliable[4], {Value} :: {any})
+				table.insert(Queue.Reliable[4], { Value } :: { any })
 			end
 		elseif Index == 5 then
 			local Value: string = ReadEVENT_destroyReplica()
@@ -529,26 +587,28 @@ Reliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: {Instance})
 				Events.Reliable[5](Value)
 			else
 				if #Queue.Reliable[5] > 256 then
-					warn("[Blink]: Event queue of \"destroyReplica\" exceeded 256, did you forget to implement a listener?")
+					warn(
+						'[Blink]: Event queue of "destroyReplica" exceeded 256, did you forget to implement a listener?'
+					)
 				end
-				table.insert(Queue.Reliable[5], {Value} :: {any})
+				table.insert(Queue.Reliable[5], { Value } :: { any })
 			end
 		elseif Index == 6 then
-			local Value: { Id: string, Method: string, Args: {[number]: any}? } = ReadEVENT_replicaWrite()
+			local Value: { Id: string, Method: string, Args: { [number]: any }? } = ReadEVENT_replicaWrite()
 			if Events.Reliable[6] ~= nil then
 				Events.Reliable[6](Value)
 			else
 				if #Queue.Reliable[6] > 256 then
-					warn("[Blink]: Event queue of \"replicaWrite\" exceeded 256, did you forget to implement a listener?")
+					warn('[Blink]: Event queue of "replicaWrite" exceeded 256, did you forget to implement a listener?')
 				end
-				table.insert(Queue.Reliable[6], {Value} :: {any})
+				table.insert(Queue.Reliable[6], { Value } :: { any })
 			end
 		elseif Index == 7 then
 			-- Read BLOCK: 1 bytes
 			local BLOCK_START = Read(1)
 			local InvocationIdentifier = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
 			if Calls[InvocationIdentifier] ~= nil then
-				local Success, ReturnValue = pcall(function ()
+				local Success, ReturnValue = pcall(function()
 					return ReadFUNCTION_RETURN_getInitialReplicas()
 				end)
 				task.spawn(Calls[InvocationIdentifier], Success, ReturnValue)
@@ -557,63 +617,74 @@ Reliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: {Instance})
 		end
 	end
 end)
-Unreliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: {Instance})
+Unreliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: { Instance })
 	RecieveCursor = 0
 	RecieveBuffer = Buffer
 	RecieveInstances = Instances
 	RecieveInstanceCursor = 0
 	local Size = buffer.len(RecieveBuffer)
-	while (RecieveCursor < Size) do
+	while RecieveCursor < Size do
 		-- Read BLOCK: 1 bytes
 		local BLOCK_START = Read(1)
 		local Index = buffer.readu8(RecieveBuffer, BLOCK_START + 0)
 	end
 end)
 
-
 local Returns = table.freeze({
 	stepReplication = StepReplication,
 
 	createReplica = {
-		on = function(Listener: (Value: { Id: string, Name: string, Tags: {[number]: any}?, Data: any?, Parent: string?, WriteLib: Instance?, IsParent: boolean? }) -> ()): () -> ()
+		on = function(Listener: (
+			Value: {
+				Id: string,
+				Name: string,
+				Tags: { [number]: any }?,
+				Data: any?,
+				Parent: string?,
+				WriteLib: Instance?,
+				IsParent: boolean?,
+			}
+		) -> ()): () -> ()
 			Events.Reliable[0] = Listener
 			for Index, Arguments in Queue.Reliable[0] do
 				Listener(table.unpack(Arguments))
 			end
 			Queue.Reliable[0] = {}
-			return function (): ()
+			return function(): ()
 				Events.Reliable[0] = nil
 			end
-		end
+		end,
 	},
 	updateReplica = {
-		on = function(Listener: (Value: { Id: string, Changes: {[number]: { Time: number, Path: {[number]: any}, Value: any? }} }) -> ()): () -> ()
+		on = function(Listener: (
+			Value: { Id: string, Changes: { [number]: { Time: number, Path: { [number]: any }, Value: any? } } }
+		) -> ()): () -> ()
 			Events.Reliable[1] = Listener
 			for Index, Arguments in Queue.Reliable[1] do
 				Listener(table.unpack(Arguments))
 			end
 			Queue.Reliable[1] = {}
-			return function (): ()
+			return function(): ()
 				Events.Reliable[1] = nil
 			end
-		end
+		end,
 	},
 	fireServerEvent = {
-		fire = function(Value: { Id: string, Args: {[number]: any} }): ()
+		fire = function(Value: { Id: string, Args: { [number]: any } }): ()
 			WriteEVENT_fireServerEvent(Value)
-		end
+		end,
 	},
 	fireClientEvent = {
-		on = function(Listener: (Value: { Id: string, Args: {[number]: any} }) -> ()): () -> ()
+		on = function(Listener: (Value: { Id: string, Args: { [number]: any } }) -> ()): () -> ()
 			Events.Reliable[3] = Listener
 			for Index, Arguments in Queue.Reliable[3] do
 				Listener(table.unpack(Arguments))
 			end
 			Queue.Reliable[3] = {}
-			return function (): ()
+			return function(): ()
 				Events.Reliable[3] = nil
 			end
-		end
+		end,
 	},
 	changeParent = {
 		on = function(Listener: (Value: { Id: string, Parent: string? }) -> ()): () -> ()
@@ -622,10 +693,10 @@ local Returns = table.freeze({
 				Listener(table.unpack(Arguments))
 			end
 			Queue.Reliable[4] = {}
-			return function (): ()
+			return function(): ()
 				Events.Reliable[4] = nil
 			end
-		end
+		end,
 	},
 	destroyReplica = {
 		on = function(Listener: (Value: string) -> ()): () -> ()
@@ -634,25 +705,35 @@ local Returns = table.freeze({
 				Listener(table.unpack(Arguments))
 			end
 			Queue.Reliable[5] = {}
-			return function (): ()
+			return function(): ()
 				Events.Reliable[5] = nil
 			end
-		end
+		end,
 	},
 	replicaWrite = {
-		on = function(Listener: (Value: { Id: string, Method: string, Args: {[number]: any}? }) -> ()): () -> ()
+		on = function(Listener: (Value: { Id: string, Method: string, Args: { [number]: any }? }) -> ()): () -> ()
 			Events.Reliable[6] = Listener
 			for Index, Arguments in Queue.Reliable[6] do
 				Listener(table.unpack(Arguments))
 			end
 			Queue.Reliable[6] = {}
-			return function (): ()
+			return function(): ()
 				Events.Reliable[6] = nil
 			end
-		end
+		end,
 	},
 	getInitialReplicas = {
-		invoke = function(Value: nil): ({ { Id: string, Name: string, Tags: {[number]: any}?, Data: any?, Parent: string?, WriteLib: Instance?, IsParent: boolean? } })
+		invoke = function(Value: nil): {
+			{
+				Id: string,
+				Name: string,
+				Tags: { [number]: any }?,
+				Data: any?,
+				Parent: string?,
+				WriteLib: Instance?,
+				IsParent: boolean?,
+			}
+		}
 			local InvocationIdentifier = Invoke()
 			if Calls[InvocationIdentifier] ~= nil then
 				Invocations -= 1
@@ -660,12 +741,23 @@ local Returns = table.freeze({
 			end
 			WriteFUNCTION_DATA_getInitialReplicas(Value, InvocationIdentifier)
 			Calls[InvocationIdentifier] = coroutine.running()
-			local Success, ReturnValue: { { Id: string, Name: string, Tags: {[number]: any}?, Data: any?, Parent: string?, WriteLib: Instance?, IsParent: boolean? } } = coroutine.yield()
+			local Success, ReturnValue: {
+				{
+					Id: string,
+					Name: string,
+					Tags: { [number]: any }?,
+					Data: any?,
+					Parent: string?,
+					WriteLib: Instance?,
+					IsParent: boolean?,
+				}
+			} =
+				coroutine.yield()
 			if Success ~= true then
-				error("There was an exception while processing \"getInitialReplicas\".")
+				error('There was an exception while processing "getInitialReplicas".')
 			end
 			return ReturnValue
-		end
+		end,
 	},
 })
 type BLINK_EVENTS_SYMBOL = typeof(Returns)
