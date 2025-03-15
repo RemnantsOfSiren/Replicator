@@ -65,7 +65,6 @@ function Replica:Fire(...)
 	local Args = { ... }
 
 	Net.fireServerEvent.fire({
-		Name = self.Name,
 		Id = self.Id,
 		Args = Args,
 	})

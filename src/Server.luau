@@ -542,7 +542,7 @@ Net.fireServerEvent.on(function(Player, Packet)
 	local _Replica = Replicas[Packet.Id]
 
 	if _Replica then
-		_Replica.__Fired:Fire(Player, if Packet.Args then unpack(Packet.Args) else nil)
+		_Replica.__Fired:Fire(Player, unpack(Packet.Args or {}))
 	end
 end)
 
