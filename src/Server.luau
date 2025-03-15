@@ -52,11 +52,11 @@ function Replica:Write(Method: string, ...: any)
 end
 
 --[=[
-    @method SetValue
-    @within Replica
-    @server
-    @param path { string }
-    @param value any
+	@method SetValue
+	@within Replica
+	@server
+	@param path { string }
+	@param value any
 
 	Updates the specified path to the provided value.
 	-- This isn't the recommended use of the API, and should only be used in cases of backwards compatibility.
@@ -146,7 +146,6 @@ function Replica:SetParent(Parent: Types.ServerReplica)
 	end
 
 	self.__Parent = Parent
-
 	local Previous: any = self.To
 	self.To = Parent.To
 
@@ -169,14 +168,14 @@ function Replica:SetParent(Parent: Types.ServerReplica)
 end
 
 --[=[
-    @method ReplicateFor
-    @within Replica
-    @server
+	@method ReplicateFor
+	@within Replica
+	@server
 	@param Player Player
-    @return nil
+	@return nil
 
-    Replicates the replica to the specified player.
-    This should only ever be intentionally called from the Server.
+	Replicates the replica to the specified player.
+	This should only ever be intentionally called from the Server.
 	-- Credit to @Fuse for implementation of this function.
 ]=]
 function Replica:ReplicateFor(player: Player)
@@ -235,13 +234,13 @@ function Replica:Destroy()
 end
 
 --[=[
-    @method DestroyFor
-    @within Replica
-    @server
-    @return nil
+	@method DestroyFor
+	@within Replica
+	@server
+	@return nil
 
-    Destroys the replica for the specified player.
-    This should only ever be intentionally called from the Server.
+	Destroys the replica for the specified player.
+	This should only ever be intentionally called from the Server.
 	-- Credit to @Fuse for implementation of this function.
 ]=]
 function Replica:DestroyFor(Player: Player)
