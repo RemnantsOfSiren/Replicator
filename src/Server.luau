@@ -55,8 +55,8 @@ end
 	@method SetValue
 	@within Replica
 	@server
-	@param path { string }
-	@param value any
+	@param Path { string | number } | string | number
+	@param Value any
 
 	Updates the specified path to the provided value.
 	-- This isn't the recommended use of the API, and should only be used in cases of backwards compatibility.
