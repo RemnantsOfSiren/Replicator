@@ -46,7 +46,7 @@ event fireServerEvent {
     Call: SingleSync,
     Data: struct {
         Id: string,
-        Args: unknownArray,
+        Args: unknownArray?,
     }
 }
 
@@ -56,7 +56,7 @@ event fireClientEvent {
     Call: SingleSync,
     Data: struct {
         Id: string,
-        Args: unknownArray,
+        Args: unknownArray?,
     }
 }
 

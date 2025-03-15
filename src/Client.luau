@@ -1,13 +1,9 @@
 --!strict
 local Sift = require(script.Parent.Parent.Sift) :: any
-local Trove = require(script.Parent.Parent.Trove) :: any
-local Signal = require(script.Parent.Parent.Signal) :: any
 
 local Net = require(script.Parent.Net.Client)
 local Types = require(script.Parent.Types)
 local Logger = require(script.Parent.Logger)
-
-local SharedFunctions = require(script.Parent.SharedFunctions)
 
 local Array = Sift.Array
 local Dictionary = Sift.Dictionary
@@ -34,10 +30,13 @@ local function FindReplicaById(Id: string?): Types.ClientReplica?
 	return nil
 end
 
-local Replica = {}
-Replica.__index = Replica
+local Replica = require(script.Parent.Replica)
 
-function Replica:GetChildren()
+local ClientReplica = {}
+ClientReplica.__index = ClientReplica
+setmetatable(ClientReplica, { __index = Replica })
+
+function ClientReplica:GetChildren()
 	if self.__IsParent then
 		return Dictionary.filter(Replicas, function(_, _Replica)
 			return _Replica.__Parent == self
@@ -57,37 +56,39 @@ end
 
 	Listens for a client event, and fires the callback with the arguments passed.
 ]=]
-function Replica:OnClientEvent(Callback: (...any) -> nil): { Disconnect: () -> nil }
+function ClientReplica:OnClientEvent(Callback: (...any) -> nil): { Disconnect: () -> nil }
 	return self.__Fired:Connect(Callback)
 end
 
-function Replica:Fire(...)
+function ClientReplica:Fire(...)
 	local Args = { ... }
 
 	Net.fireServerEvent.fire({
-		Name = self.Name,
 		Id = self.Id,
 		Args = Args,
 	})
 end
 
-function Replica:Destroy()
+function ClientReplica:Destroy()
 	Replicas[self.Id] = nil
 	self.Destroying:Fire()
-	task.defer(self.__Cleaner.Destroy, self.__Cleaner)
 	table.clear(self)
 end
 
+export type ClientReplica = typeof(setmetatable({} :: Types.ClientReplica, ClientReplica))
+
 local function NewReplica(Config: {
-	Name: string,
 	Id: string,
-	Tags: { any },
-	Data: any,
-	WriteLib: ModuleScript?,
+	Name: string,
+	Tags: { any }?,
+	Data: any?,
+	WriteLib: Instance?,
 	Parent: string?,
 	IsParent: boolean?,
-}): Types.ClientReplica
-	local Cleaner = Trove.new()
+}): ClientReplica
+	if Config.WriteLib and not Config.WriteLib:IsA("ModuleScript") then
+		return Logger("Warn", "WriteLib must be a ModuleScript.")
+	end
 
 	local Parent
 
@@ -98,32 +99,7 @@ local function NewReplica(Config: {
 		until Parent
 	end
 
-	local self = setmetatable({
-		Id = Config.Id,
-		Name = Config.Name,
-		Tags = Config.Tags,
-		Data = Config.Data,
-		__IsParent = Config.IsParent,
-
-		__Write = Cleaner:Construct(Signal),
-		__Fired = Cleaner:Construct(Signal),
-		__Change = Cleaner:Construct(Signal),
-		Destroying = Cleaner:Construct(Signal),
-
-		__Cleaner = Cleaner,
-
-		__Parent = Parent,
-		WriteLib = Config.WriteLib,
-		__WriteLib = Config.WriteLib and require(Config.WriteLib) :: { [any]: any } or nil,
-	}, Replica)
-
-	for Key, Function in SharedFunctions do
-		self[Key] = Function
-	end
-
-	self.__Cleaner:Connect(self.Destroying, function()
-		self.__Cleaner:Destroy()
-	end)
+	local self = setmetatable(Replica.new(Config), ClientReplica)
 
 	Replicas[Config.Id] = self
 
@@ -164,7 +140,7 @@ function Replicator:AddReplica(_Replica)
 	end
 end
 
-local function NewReplicator(Name: string, IsParent: boolean)
+local function NewReplicator(Name: string, IsParent: boolean?)
 	if Replicators[Name] then
 		return Replicators[Name]
 	end
@@ -208,11 +184,6 @@ Net.updateReplica.on(function(Data: Types.Packet)
 	local _Replica = Replicas[Data.Id]
 
 	if _Replica then
-		if _Replica.__IsParent then
-			Logger("Warn", "Parent replicas cannot be altered.")
-			return
-		end
-
 		table.sort(Data.Changes, function(A, B)
 			return A.Time < B.Time
 		end)
