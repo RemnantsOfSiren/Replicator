@@ -233,38 +233,47 @@ local function ReadEVENT_updateReplica(): ({ Id: string, Changes: {[number]: { T
 	return Value
 end
 
-local function WriteEVENT_fireServerEvent(Value: { Id: string, Args: {[number]: any} }): ()
-	-- Allocate BLOCK: 5 bytes
-	local BLOCK_START = Allocate(5)
+local function WriteEVENT_fireServerEvent(Value: { Id: string, Args: {[number]: any}? }): ()
+	-- Allocate BLOCK: 4 bytes
+	local BLOCK_START = Allocate(4)
 	buffer.writeu8(SendBuffer, BLOCK_START + 0, 2)
 	local Length = #Value.Id
 	buffer.writeu16(SendBuffer, BLOCK_START + 1, Length)
 	Allocate(Length)
 	buffer.writestring(SendBuffer, SendOffset, Value.Id, Length)
-	local Elements_1 = 0
-	for Key_1, Element_1 in Value.Args do
-		Elements_1 += 1
-		local OFFSET_0 = Allocate(1)
-		buffer.writeu8(SendBuffer, OFFSET_0, Key_1)
-		table.insert(SendInstances, Element_1 or Null)
+	buffer.writeu8(SendBuffer, BLOCK_START + 3, Value.Args ~= nil and 1 or 0)
+	if Value.Args ~= nil then
+		-- Allocate BLOCK: 2 bytes
+		local BLOCK_START = Allocate(2)
+		local Elements_2 = 0
+		for Key_2, Element_2 in Value.Args do
+			Elements_2 += 1
+			local OFFSET_0 = Allocate(1)
+			buffer.writeu8(SendBuffer, OFFSET_0, Key_2)
+			table.insert(SendInstances, Element_2 or Null)
+		end
+		buffer.writeu16(SendBuffer, BLOCK_START + 0, Elements_2)
 	end
-	buffer.writeu16(SendBuffer, BLOCK_START + 3, Elements_1)
 end
 
-local function ReadEVENT_fireClientEvent(): ({ Id: string, Args: {[number]: any} })
-	-- Read BLOCK: 4 bytes
-	local BLOCK_START = Read(4)
+local function ReadEVENT_fireClientEvent(): ({ Id: string, Args: {[number]: any}? })
+	-- Read BLOCK: 3 bytes
+	local BLOCK_START = Read(3)
 	local Value = {} :: any
 	local Length = buffer.readu16(RecieveBuffer, BLOCK_START + 0)
 	Value.Id = buffer.readstring(RecieveBuffer, Read(Length), Length)
-	Value.Args = {}
-	local Elements_1 = buffer.readu16(RecieveBuffer, BLOCK_START + 2)
-	for _ = 1, Elements_1 do
-		local OFFSET_0 = Read(1)
-		local Key_1 = buffer.readu8(RecieveBuffer, OFFSET_0)
-		RecieveInstanceCursor += 1
-		local Element_1 = RecieveInstances[RecieveInstanceCursor]
-		Value.Args[Key_1] = Element_1
+	if buffer.readu8(RecieveBuffer, BLOCK_START + 2) == 1 then
+		-- Read BLOCK: 2 bytes
+		local BLOCK_START = Read(2)
+		Value.Args = {}
+		local Elements_2 = buffer.readu16(RecieveBuffer, BLOCK_START + 0)
+		for _ = 1, Elements_2 do
+			local OFFSET_0 = Read(1)
+			local Key_2 = buffer.readu8(RecieveBuffer, OFFSET_0)
+			RecieveInstanceCursor += 1
+			local Element_2 = RecieveInstances[RecieveInstanceCursor]
+			Value.Args[Key_2] = Element_2
+		end
 	end
 	return Value
 end
@@ -486,7 +495,7 @@ Reliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: {Instance})
 				table.insert(Queue.Reliable[1], {Value} :: {any})
 			end
 		elseif Index == 3 then
-			local Value: { Id: string, Args: {[number]: any} } = ReadEVENT_fireClientEvent()
+			local Value: { Id: string, Args: {[number]: any}? } = ReadEVENT_fireClientEvent()
 			if Events.Reliable[3] ~= nil then
 				Events.Reliable[3](Value)
 			else
@@ -581,12 +590,12 @@ local Returns = table.freeze({
 		end
 	},
 	fireServerEvent = {
-		fire = function(Value: { Id: string, Args: {[number]: any} }): ()
+		fire = function(Value: { Id: string, Args: {[number]: any}? }): ()
 			WriteEVENT_fireServerEvent(Value)
 		end
 	},
 	fireClientEvent = {
-		on = function(Listener: (Value: { Id: string, Args: {[number]: any} }) -> ()): () -> ()
+		on = function(Listener: (Value: { Id: string, Args: {[number]: any}? }) -> ()): () -> ()
 			Events.Reliable[3] = Listener
 			for Index, Arguments in Queue.Reliable[3] do
 				Listener(table.unpack(Arguments))

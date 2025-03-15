@@ -11,7 +11,7 @@ local Parser = require(script.Parent.Parser)
 local Replica = {}
 Replica.__index = Replica
 
-export type Replica = typeof(setmetatable({} :: Types.Replica, Replica))
+export type Replica = typeof(setmetatable({} :: Types.Replica, Replica)) & {}
 
 function Replica:Write(Method: string, Callback: (...any) -> nil)
 	return self.__Write:Connect(function(_Method: string, Args: { any })
@@ -150,8 +150,8 @@ function Replica:ObserveChange(Path: Types.ValidPath, Callback: (...any) -> nil)
 	return self:ListenToChange(Path, Callback, false)
 end
 
-function Replica:AddCleanupTask(Task: () -> nil, CleanupMethod: string | boolean?)
-	return self.__Cleaner:Add(Task, if not CleanupMethod then true else CleanupMethod)
+function Replica:AddCleanupMethod(Cleanup: any, CleanupMethod: (string | boolean)?)
+	return self.__Cleaner:Add(Cleanup, CleanupMethod)
 end
 
 function Replica.new(Config: Types.Config): Replica
