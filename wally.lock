@@ -13,14 +13,9 @@ version = "1.10.0"
 dependencies = []
 
 [[package]]
-name = "data-oriented-house/squash"
-version = "2.5.0"
-dependencies = []
-
-[[package]]
 name = "remnantsofsiren/replicator2"
 version = "1.3.5-experimental"
-dependencies = [["Sift", "csqrl/sift@0.0.9"], ["Signal", "data-oriented-house/lemonsignal@1.10.0"], ["Squash", "data-oriented-house/squash@2.5.0"], ["Trove", "sleitnick/trove@1.4.0"]]
+dependencies = [["Sift", "csqrl/sift@0.0.9"], ["Signal", "data-oriented-house/lemonsignal@1.10.0"], ["Trove", "sleitnick/trove@1.4.0"]]
 
 [[package]]
 name = "sleitnick/trove"

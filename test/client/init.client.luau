@@ -9,9 +9,10 @@ for i = 1, 20 do
             
             Replica:OnClientEvent(function(...)
                 print("ClientEvent:", ...)
-            end)       
+            end) 
+                  
             Replica:ListenToChange("TestArray", function(Value, OldValue)
-               print("NewValue:", Value, "OldValue:", OldValue)
+               --print("NewValue:", Value, "OldValue:", OldValue)
             end)
 
             task.delay(10, function()
