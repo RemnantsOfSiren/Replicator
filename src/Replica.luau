@@ -179,7 +179,9 @@ function Replica.new(Config: Types.Config): Replica
 	}, Replica)
 
 	self.__Cleaner:Connect(self.Destroying, function()
-		self.__Cleaner:Destroy()
+		if self.__Cleaner then
+			self.__Cleaner:Destroy()
+		end
 	end)
 
 	return self
