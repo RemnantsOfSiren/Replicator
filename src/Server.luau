@@ -385,7 +385,7 @@ local function ListenToTable(RegisterUpdate: (...any) -> nil, Table, Indicies: {
 				Logger("Warn", "Use :Remove() to remove an element from an array.")
 				return
 			else
-				local TValue = rawget(Table, Key)
+				local TValue = rawget(Table.__value, Key)
 				if
 					(IsTable and type(TValue) == "table" and not Dictionary.equalsDeep(Value, TValue))
 					or TValue ~= Value
