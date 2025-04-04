@@ -13,21 +13,7 @@ local Replicas = {}
 local Replicators = {}
 
 local function FindReplicaById(Id: string?): Types.ClientReplica?
-	if Id then
-		for _, _Replicator in pairs(Replicators) do
-			if not _Replicator.IsParent then
-				continue
-			end
-
-			local _Replica = _Replicator.__Replicas[Id]
-
-			if _Replica then
-				return _Replica
-			end
-		end
-	end
-
-	return nil
+	return Replicas[Id]
 end
 
 local Replica = require(script.Parent.Replica)
@@ -72,6 +58,7 @@ end
 function ClientReplica:Destroy()
 	Replicas[self.Id] = nil
 	self.Destroying:Fire()
+	task.defer(self.__Cleaner.Destroy, self.__Cleaner)
 	table.clear(self)
 end
 
@@ -105,7 +92,7 @@ function Replicator:AddListener(Callback)
 	table.insert(self.__Listeners, Callback)
 
 	for _, _Replica in pairs(self.__Replicas) do
-		task.spawn(Callback, _Replica)
+		task.spawn(Callback, FindReplicaById(_Replica))
 	end
 
 	return function()
@@ -119,14 +106,15 @@ function Replicator:AddListener(Callback)
 end
 
 function Replicator:AddReplica(_Replica)
-	if self.__Replicas[_Replica.Id] then
+	if table.find(self.__Replicas, _Replica.Id) then
 		return
 	elseif _Replica.Name ~= self.Name then
 		Logger("Warn", "Replica name does not match replicator name.")
 		return
 	end
 
-	self.__Replicas[_Replica.Id] = _Replica
+	table.insert(self.__Replicas, _Replica.Id)
+	
 	for _, Listener in self.__Listeners do
 		task.spawn(Listener, _Replica)
 	end
@@ -160,14 +148,16 @@ Net.createReplica.on(function(_Replica)
 end)
 
 Net.destroyReplica.on(function(Id)
-	local _Replica = Replicas[Id]
+	local _Replica = FindReplicaById(Id)
 
 	if _Replica then
 		local Name = _Replica.Name
 		local _Replicator = Replicators[Name]
+		
 		if _Replicator then
-			_Replicator.__Replicas[Id] = nil
+			table.remove(_Replicator.__Replicas, table.find(_Replicator.__Replicas, Id))
 		end
+
 		_Replica:Destroy()
 	end
 end)
