@@ -219,7 +219,8 @@ function ServerReplica:Destroy()
 			Net.destroyReplica.fireAll(ChildReplica.Id)
 		end
 	end
-
+	
+	task.defer(self.__Cleaner.Destroy, self.__Cleaner)
 	table.clear(self)
 end
 
