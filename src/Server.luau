@@ -11,7 +11,7 @@ local Array = Sift.Array
 local Dictionary = Sift.Dictionary
 local CopyDeep = Dictionary.copyDeep
 
-local Replicas = {}
+local Replicas: { [string]: ServerReplica } = {}
 
 local Replica = require(script.Parent.Replica)
 
@@ -637,7 +637,7 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 
 			table.clear(Changes)
 
-			task.wait(.1)
+			task.wait(.5)
 		end
 	end), true)
 

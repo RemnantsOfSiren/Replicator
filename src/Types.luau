@@ -30,7 +30,7 @@ export type Replica = {
 	ListenToWrite: Hook?,
 	ListenToChange: Hook?,
 	ListenToNewKey: Hook?,
-	AddCleanupTask: (self: Replica, Task: () -> nil, CleanupMethod: any) -> any,
+	AddCleanupMethod: (self: Replica, Method: any, CleanupMethod: any?) -> any,
 	ListenToKeyRemoved: Hook?,
 }
 
