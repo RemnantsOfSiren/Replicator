@@ -28,7 +28,7 @@ function ClientReplica:GetChildren()
 			return _Replica.__Parent == self
 		end)
 	else
-		warn("Replica is not a parent.")
+		Logger("Warn", "Replica is not a parent.")
 		return {}
 	end
 end
@@ -78,7 +78,7 @@ local function NewReplica(Config: Types.ClientConfig): ClientReplica
 		until Parent
 	end
 
-	local self = setmetatable(Replica.new(Config), ClientReplica)
+	local self = setmetatable(Replica.new(Config), ClientReplica) :: ClientReplica
 
 	Replicas[Config.Id] = self
 
@@ -141,7 +141,7 @@ Net.createReplica.on(function(_Replica)
 	local _Replicator = NewReplicator(_Replica.Name, _Replica.IsParent)
 
 	if not Replicas[_Replica.Id] then
-		task.spawn(_Replicator.AddReplica, _Replicator, NewReplica(_Replica))
+		task.spawn(_Replicator.AddReplica, _Replicator, NewReplica(_Replica :: any))
 	else
 		Logger("Warn", "Replica already exists")
 	end
@@ -174,6 +174,10 @@ Net.updateReplica.on(function(Data: Types.Packet)
 			local Path = Change.Path
 			local _Data = _Replica.Data
 
+			if not _Data then
+				continue
+			end
+
 			for I = 1, #Path - 1 do
 				local Key = Path[I]
 				_Data = _Data[Key]
@@ -200,11 +204,11 @@ Net.updateReplica.on(function(Data: Types.Packet)
 					and (Array.is(_Data) or Dictionary.count(_Data) == 0)
 				then
 					if Value == nil then
-						table.remove(_Data, LastKey :: number)
+						table.remove(_Data :: { [number]: any }, LastKey :: number)
 					elseif _Data[LastKey] then
 						_Data[LastKey] = Value
 					else
-						table.insert(_Data, LastKey :: number, Value)
+						table.insert(_Data :: { [number]: any }, LastKey :: number, Value)
 					end
 				else
 					pcall(function()
@@ -222,7 +226,8 @@ Net.fireClientEvent.on(function(Data)
 	local _Replica = Replicas[Data.Id]
 
 	if _Replica then
-		_Replica.__Fired:Fire(table.unpack(Data.Args))
+		local Args = Data.Args or {}
+		_Replica.__Fired:Fire(table.unpack(Args))
 	end
 end)
 
@@ -231,14 +236,14 @@ Net.changeParent.on(function(Info)
 
 	if _Replica then
 		local _Parent = FindReplicaById(Info.Parent)
-		_Replica.__Parent = _Parent
+		_Replica.Parent = _Parent
 	end
 end)
 
 task.defer(function()
 	local _Replicas = Net.getInitialReplicas.invoke()
 
-	table.sort(_Replicas, function(A, B)
+	table.sort(_Replicas, function(A: {[any]: any}, B: {[any]: any})
 		return A.IsParent and not B.IsParent
 	end)
 
@@ -250,7 +255,7 @@ task.defer(function()
 		end
 
 		if not Replicas[_Replica.Id] then
-			task.spawn(_Replicator.AddReplica, _Replicator, NewReplica(_Replica))
+			task.spawn(_Replicator.AddReplica, _Replicator, NewReplica(_Replica :: any))
 		end
 	end
 end)
@@ -286,7 +291,7 @@ return table.freeze({
 				until _Replicator
 			end
 
-			Listener = _Replicator:AddListener(Callback)
+			Listener = (_Replicator :: any):AddListener(Callback)
 		end)
 
 		return Disconnector
