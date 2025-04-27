@@ -1,6 +1,9 @@
 local Trove = require(script.Parent.Parent.Trove) :: any
 local Signal = require(script.Parent.Parent.Signal) :: any
 
+type Signal = typeof(Signal.new())
+type Cleaner = typeof(Trove.new())
+
 export type ValidPath = { string | number } | string | number
 export type ToOptions = { Player } | Player | "All"
 
@@ -14,18 +17,17 @@ export type Hook = (
 export type Replica = {
 	Id: string,
 	Name: string,
-	Tags: { any },
-	Data: any?,
+	Tags: { any }?,
 	__OldData: { [string | number]: any }?,
 
 	WriteLib: ModuleScript?,
 	__WriteLib: { [any]: any }?,
 
-	__Fired: typeof(Signal.new()),
-	__Write: typeof(Signal.new()),
-	__Change: typeof(Signal.new()),
-	__Cleaner: typeof(Trove.new()),
-	Destroying: typeof(Signal.new()),
+	__Fired: Signal,
+	__Write: Signal,
+	__Change: Signal,
+	__Cleaner: Cleaner,
+	Destroying: Signal,
 
 	ListenToWrite: Hook?,
 	ListenToChange: Hook?,
@@ -52,7 +54,7 @@ export type ServerReplica = Replica & {
 	__Ready: boolean?,
 	__Changes: { [any]: any },
 	__IsParent: boolean?,
-	__ReplicateToChanged: (self: ServerReplica, New: any, Old: any) -> nil,
+	__ReplicateToChanged: Signal,
 
 	To: ToOptions?,
 	Parent: ServerReplica?,
@@ -93,7 +95,7 @@ export type ServerConfig = Config & {
 
 export type ClientConfig = Config & {
 	Id: string,
-	Parent: ClientReplica?,
+	Parent: string?,
 }
 
 export type ServerReplicator = {

@@ -409,7 +409,7 @@ local function ListenToTable(RegisterUpdate: (...any) -> nil, Table, Indicies: {
 			end
 
 			if (Sift.Array.is(Table) or Sift.Dictionary.count(Table) == 0) and not rawget(self, "Insert") then
-				rawset(self, "Insert", function(_, ...)
+				rawset(self :: { [string | number]: any }, "Insert", function(_, ...)
 					local Args = { ... }
 					local InsertIndices = table.clone(Indicies or {})
 					local Index = if #Args > 1 then Args[1] else #Table + 1
@@ -423,12 +423,12 @@ local function ListenToTable(RegisterUpdate: (...any) -> nil, Table, Indicies: {
 					OldData = CopyDeep(Table)
 				end)
 				rawset(self, "insert", rawget(self, "Insert"))
-				rawset(self, "Remove", function(_, Index: number)
+				rawset(self :: {[string | number]: any }, "Remove", function(_, Index: number)
 					local _Indicies = table.clone(Indicies or {})
 					_Indicies[#_Indicies + 1] = Index
 					local _Value = table.remove(Table, Index)
 					if _Value and type(_Value) == "table" then
-						rawset(self, Index, nil)
+						rawset(self :: { [string | number]: any }, Index, nil)
 					end
 					RegisterUpdate(_Indicies, nil, OldData)
 					OldData = CopyDeep(Table)
@@ -484,6 +484,7 @@ local function ListenToTable(RegisterUpdate: (...any) -> nil, Table, Indicies: {
 	rawset(Method, "Get", function()
 		return CopyDeep(Table)
 	end)
+
 	rawset(Method, "get", rawget(Method, "Get"))
 
 	for Index, Value in Table do
@@ -538,7 +539,7 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 		Config.To = "All"
 	end
 
-	local self = setmetatable(Replica.new(Config), ServerReplica)
+	local self = setmetatable(Replica.new(Config), ServerReplica) :: ServerReplica
 
 	self.__ReplicateToChanged = Signal.new()
 	
@@ -563,7 +564,7 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 
 		for _, Player in New do
 			if not table.find(Previous, Player) then
-				CreateReplica(Player, self)
+				CreateReplica(Player, self :: {[string | number]: any })
 			end
 		end
 	end)
@@ -637,7 +638,7 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 
 			table.clear(Changes)
 
-			task.wait(.5)
+			task.wait()
 		end
 	end), true)
 
@@ -649,7 +650,7 @@ Net.getInitialReplicas.on(function(Player: Player)
 		Dictionary.filter(Replicas, function(_Replica)
 			return _Replica.To == "All"
 				or (typeof(_Replica.To) == "table" and table.find(_Replica.To, Player))
-				or _Replica.To == Player
+				or (_Replica.To :: Player) == Player
 		end),
 		function(_Replica)
 			return {
