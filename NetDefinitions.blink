@@ -17,7 +17,6 @@ struct replica {
 
 struct replicaChange {
     Path: unknownArray,
-    Time: f64,
     Value: unknown?,
 }
 
@@ -34,7 +33,7 @@ event updateReplicas {
     From: Server,
     Type: Reliable,
     Call: SingleSync,
-    Data: map { [string]: arrayOfChanges }
+    Data: map { [string]: arrayOfChanges } 
 }
 
 event fireServerEvent {
