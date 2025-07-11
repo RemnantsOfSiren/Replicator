@@ -159,8 +159,8 @@ Queue.Reliable[6] = table.create(256)
 Queue.Reliable[7] = table.create(256)
 export type unknownArray = {[number]: any}
 export type replica = { Id: string, Name: string, Tags: any?, Data: any?, Parent: string?, WriteLib: Instance?, IsParent: boolean? }
-export type replicaChange = { Path: {[number]: any}, Time: number, Value: any? }
-export type arrayOfChanges = {[number]: { Path: {[number]: any}, Time: number, Value: any? }}
+export type replicaChange = { Path: {[number]: any}, Value: any? }
+export type arrayOfChanges = {[number]: { Path: {[number]: any}, Value: any? }}
 local function ReadEVENT_createReplica(): ({ Id: string, Name: string, Tags: any?, Data: any?, Parent: string?, WriteLib: Instance?, IsParent: boolean? })
 	-- Read BLOCK: 8 bytes
 	local BLOCK_START = Read(8)
@@ -199,7 +199,7 @@ local function ReadEVENT_createReplica(): ({ Id: string, Name: string, Tags: any
 	return Value
 end
 
-local function ReadEVENT_updateReplicas(): ({[string]: {[number]: { Path: {[number]: any}, Time: number, Value: any? }}})
+local function ReadEVENT_updateReplicas(): ({[string]: {[number]: { Path: {[number]: any}, Value: any? }}})
 	-- Read BLOCK: 2 bytes
 	local BLOCK_START = Read(2)
 	local Value = {}
@@ -225,10 +225,8 @@ local function ReadEVENT_updateReplicas(): ({[string]: {[number]: { Path: {[numb
 				local Element_3 = RecieveInstances[RecieveInstanceCursor]
 				Element_2.Path[Key_3] = Element_3
 			end
-			local OFFSET_2 = Read(8)
-			Element_2.Time = buffer.readf64(RecieveBuffer, OFFSET_2)
-			local OFFSET_3 = Read(1)
-			if buffer.readu8(RecieveBuffer, OFFSET_3) == 1 then
+			local OFFSET_2 = Read(1)
+			if buffer.readu8(RecieveBuffer, OFFSET_2) == 1 then
 				RecieveInstanceCursor += 1
 				Element_2.Value = RecieveInstances[RecieveInstanceCursor]
 			end
@@ -491,7 +489,7 @@ Reliable.OnClientEvent:Connect(function(Buffer: buffer, Instances: {Instance})
 				table.insert(Queue.Reliable[0], {Value} :: {any})
 			end
 		elseif Index == 1 then
-			local Value: {[string]: {[number]: { Path: {[number]: any}, Time: number, Value: any? }}} = ReadEVENT_updateReplicas()
+			local Value: {[string]: {[number]: { Path: {[number]: any}, Value: any? }}} = ReadEVENT_updateReplicas()
 			if Events.Reliable[1] ~= nil then
 				Events.Reliable[1](Value)
 			else
@@ -584,7 +582,7 @@ local Returns = table.freeze({
 		end
 	},
 	updateReplicas = {
-		on = function(Listener: (Value: {[string]: {[number]: { Path: {[number]: any}, Time: number, Value: any? }}}) -> ()): () -> ()
+		on = function(Listener: (Value: {[string]: {[number]: { Path: {[number]: any}, Value: any? }}}) -> ()): () -> ()
 			Events.Reliable[1] = Listener
 			for Index, Arguments in Queue.Reliable[1] do
 				Listener(table.unpack(Arguments))

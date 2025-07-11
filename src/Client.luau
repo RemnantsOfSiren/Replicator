@@ -1,9 +1,9 @@
 --!strict
 local Sift = require(script.Parent.Parent.Sift) :: any
 
+local Logger = require(script.Parent.Logger)
 local Net = require(script.Parent.Net.Client)
 local Types = require(script.Parent.Types)
-local Logger = require(script.Parent.Logger)
 
 local Array = Sift.Array
 local Dictionary = Sift.Dictionary
@@ -114,7 +114,7 @@ function Replicator:AddReplica(_Replica)
 	end
 
 	table.insert(self.__Replicas, _Replica.Id)
-	
+
 	for _, Listener in self.__Listeners do
 		task.spawn(Listener, _Replica)
 	end
@@ -153,7 +153,7 @@ Net.destroyReplica.on(function(Id)
 	if _Replica then
 		local Name = _Replica.Name
 		local _Replicator = Replicators[Name]
-		
+
 		if _Replicator then
 			table.remove(_Replicator.__Replicas, table.find(_Replicator.__Replicas, Id))
 		end
@@ -191,7 +191,6 @@ end)
 -- 				end
 -- 			end
 
-			
 -- 			if _Data then
 -- 				local _OldData = CopyDeep(_Replica.Data)
 -- 				local LastKey = Path[#Path]
@@ -240,14 +239,12 @@ Net.changeParent.on(function(Info)
 	end
 end)
 
-local function BatchUpdateReplica(Id: string, Changes: {{ Path: { [any]: any }, Value: any, Time: number }})
+local function BatchUpdateReplica(Id: string, Changes: { { Path: { [any]: any }, Value: any } })
 	if #Changes == 0 then
 		return
 	end
 
-	table.sort(Changes, function(A, B)
-		return A.Time < B.Time
-	end)
+	print(`BatchUpdateReplica: {Id} with {#Changes} changes.`)
 
 	local _Replica = Replicas[Id]
 
@@ -259,32 +256,30 @@ local function BatchUpdateReplica(Id: string, Changes: {{ Path: { [any]: any }, 
 		local Path = Change.Path
 		local Value = Change.Value
 		local _Data = _Replica.Data
-		
+
 		if not _Data then
 			continue
 		end
-		
+
 		for I = 1, #Path - 1 do
 			local Key = Path[I]
 			_Data = _Data[Key]
-			
+
 			if type(_Data) ~= "table" then
 				Logger("Warn", `Replica ({_Replica.Id}) attempting to index a non table value at key {Key}.`)
 			end
-			
+
 			if not _Data then
 				return
 			end
 		end
-		
+
 		if _Data then
 			local LastKey = Path[#Path]
 			local OldData = _Data[LastKey]
 			_Data[LastKey] = Value
 			_Replica.__Change:Fire(Path, Value, OldData)
 		end
-		
-		task.wait()
 	end
 end
 
@@ -301,7 +296,7 @@ end)
 task.defer(function()
 	local _Replicas = Net.getInitialReplicas.invoke()
 
-	table.sort(_Replicas, function(A: {[any]: any}, B: {[any]: any})
+	table.sort(_Replicas, function(A: { [any]: any }, B: { [any]: any })
 		return A.IsParent and not B.IsParent
 	end)
 
