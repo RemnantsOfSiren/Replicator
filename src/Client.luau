@@ -162,65 +162,65 @@ Net.destroyReplica.on(function(Id)
 	end
 end)
 
-Net.updateReplica.on(function(Data: Types.Packet)
-	local _Replica = Replicas[Data.Id]
+-- Net.updateReplica.on(function(Data: Types.Packet)
+-- 	local _Replica = Replicas[Data.Id]
 
-	if _Replica then
-		table.sort(Data.Changes, function(A, B)
-			return A.Time < B.Time
-		end)
+-- 	if _Replica then
+-- 		table.sort(Data.Changes, function(A, B)
+-- 			return A.Time < B.Time
+-- 		end)
 
-		for _, Change in Data.Changes do
-			local Path = Change.Path
-			local _Data = _Replica.Data
+-- 		for _, Change in Data.Changes do
+-- 			local Path = Change.Path
+-- 			local _Data = _Replica.Data
 
-			if not _Data then
-				continue
-			end
+-- 			if not _Data then
+-- 				continue
+-- 			end
 
-			for I = 1, #Path - 1 do
-				local Key = Path[I]
-				_Data = _Data[Key]
+-- 			for I = 1, #Path - 1 do
+-- 				local Key = Path[I]
+-- 				_Data = _Data[Key]
 
-				if type(_Data) ~= "table" then
-					Logger("Warn", `Replica ({_Replica.Id}) attempting to index a non table value at key {Key}.`)
-				end
+-- 				if type(_Data) ~= "table" then
+-- 					Logger("Warn", `Replica ({_Replica.Id}) attempting to index a non table value at key {Key}.`)
+-- 				end
 
-				if not _Data then
-					return
-				end
-			end
+-- 				if not _Data then
+-- 					return
+-- 				end
+-- 			end
 
 			
-			if _Data then
-				local _OldData = CopyDeep(_Replica.Data)
-				local LastKey = Path[#Path]
+-- 			if _Data then
+-- 				local _OldData = CopyDeep(_Replica.Data)
+-- 				local LastKey = Path[#Path]
 
-				local Value = Change.Value
+-- 				local Value = Change.Value
 
-				if
-					LastKey ~= nil
-					and type(LastKey) == "number"
-					and (Array.is(_Data) or Dictionary.count(_Data) == 0)
-				then
-					if Value == nil then
-						table.remove(_Data :: { [number]: any }, LastKey :: number)
-					elseif _Data[LastKey] then
-						_Data[LastKey] = Value
-					else
-						table.insert(_Data :: { [number]: any }, LastKey :: number, Value)
-					end
-				else
-					pcall(function()
-						_Data[LastKey] = Value
-					end)
-				end
+-- 				if
+-- 					LastKey ~= nil
+-- 					and type(LastKey) == "number"
+-- 					and (Array.is(_Data) or Dictionary.count(_Data) == 0)
+-- 				then
+-- 					if Value == nil then
+-- 						table.remove(_Data :: { [number]: any }, LastKey :: number)
+-- 					elseif _Data[LastKey] then
+-- 						_Data[LastKey] = Value
+-- 					else
+-- 						table.insert(_Data :: { [number]: any }, LastKey :: number, Value)
+-- 					end
+-- 				else
+-- 					pcall(function()
+-- 						_Data[LastKey] = Value
+-- 					end)
+-- 				end
 
-				_Replica.__Change:Fire(Path, _Data[LastKey], _OldData)
-			end
-		end
-	end
-end)
+-- 				_Replica.__Change:Fire(Path, _Data[LastKey], _OldData)
+-- 			end
+-- 		end
+-- 	end
+-- end)
 
 Net.fireClientEvent.on(function(Data)
 	local _Replica = Replicas[Data.Id]
@@ -237,6 +237,64 @@ Net.changeParent.on(function(Info)
 	if _Replica then
 		local _Parent = FindReplicaById(Info.Parent)
 		_Replica.Parent = _Parent
+	end
+end)
+
+local function BatchUpdateReplica(Id: string, Changes: {{ Path: { [any]: any }, Value: any, Time: number }})
+	if #Changes == 0 then
+		return
+	end
+
+	table.sort(Changes, function(A, B)
+		return A.Time < B.Time
+	end)
+
+	local _Replica = Replicas[Id]
+
+	if not _Replica then
+		return
+	end
+
+	for _, Change in Changes do
+		local Path = Change.Path
+		local Value = Change.Value
+		local _Data = _Replica.Data
+		
+		if not _Data then
+			continue
+		end
+		
+		for I = 1, #Path - 1 do
+			local Key = Path[I]
+			_Data = _Data[Key]
+			
+			if type(_Data) ~= "table" then
+				Logger("Warn", `Replica ({_Replica.Id}) attempting to index a non table value at key {Key}.`)
+			end
+			
+			if not _Data then
+				return
+			end
+		end
+		
+		if _Data then
+			local LastKey = Path[#Path]
+			local OldData = _Data[LastKey]
+			_Data[LastKey] = Value
+			_Replica.__Change:Fire(Path, Value, OldData)
+		end
+		
+		task.wait()
+	end
+end
+
+Net.updateReplicas.on(function(Data)
+	for Id, Changes in Data do
+		if #Changes == 0 then
+			continue
+		end
+
+		task.spawn(BatchUpdateReplica, Id, Changes)
 	end
 end)
 

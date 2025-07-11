@@ -353,8 +353,6 @@ end
 local ValidKeyTypes = { "string", "number" }
 
 local function ListenToTable(RegisterUpdate: (...any) -> nil, Table, Indicies: { [number]: any }?): Types.ReplicaTable
-	local OldData = CopyDeep(Table)
-
 	local Method = setmetatable({
 		__type = "Replicated Table",
 		__value = {},
@@ -400,8 +398,7 @@ local function ListenToTable(RegisterUpdate: (...any) -> nil, Table, Indicies: {
 			_Indicies[#_Indicies + 1] = Key
 
 			if Updated then
-				RegisterUpdate(_Indicies, if IsTable then CopyDeep(Value) else Value, OldData)
-				OldData = CopyDeep(Table)
+				RegisterUpdate(_Indicies, if IsTable then CopyDeep(Value) else Value)
 			end
 
 			if IsTable then
@@ -419,8 +416,7 @@ local function ListenToTable(RegisterUpdate: (...any) -> nil, Table, Indicies: {
 					if _Value and type(_Value) == "table" then
 						rawset(self, Index, ListenToTable(RegisterUpdate, _Value, InsertIndices))
 					end
-					RegisterUpdate(InsertIndices, _Value, OldData)
-					OldData = CopyDeep(Table)
+					RegisterUpdate(InsertIndices, _Value)
 				end)
 				rawset(self, "insert", rawget(self, "Insert"))
 				rawset(self :: {[string | number]: any }, "Remove", function(_, Index: number)
@@ -430,8 +426,7 @@ local function ListenToTable(RegisterUpdate: (...any) -> nil, Table, Indicies: {
 					if _Value and type(_Value) == "table" then
 						rawset(self :: { [string | number]: any }, Index, nil)
 					end
-					RegisterUpdate(_Indicies, nil, OldData)
-					OldData = CopyDeep(Table)
+					RegisterUpdate(_Indicies, nil)
 				end)
 				rawset(self, "remove", rawget(self, "Remove"))
 			elseif not Sift.Array.is(Table) and rawget(self, "Insert") then
@@ -508,8 +503,7 @@ local function ListenToTable(RegisterUpdate: (...any) -> nil, Table, Indicies: {
 			if _Value and type(_Value) == "table" then
 				rawset(Method, Index, ListenToTable(RegisterUpdate, _Value, InsertIndices))
 			end
-			RegisterUpdate(InsertIndices, _Value, OldData)
-			OldData = CopyDeep(Table)
+			RegisterUpdate(InsertIndices, _Value)
 		end)
 		rawset(Method, "insert", rawget(Method, "Insert"))
 		rawset(Method, "Remove", function(_, Index: number)
@@ -519,8 +513,7 @@ local function ListenToTable(RegisterUpdate: (...any) -> nil, Table, Indicies: {
 			if _Value and type(_Value) == "table" then
 				rawset(Method, Index, nil)
 			end
-			RegisterUpdate(_Indicies, nil, OldData)
-			OldData = CopyDeep(Table)
+			RegisterUpdate(_Indicies, nil)
 		end)
 		rawset(Method, "remove", rawget(Method, "Remove"))
 	end
@@ -529,6 +522,8 @@ local function ListenToTable(RegisterUpdate: (...any) -> nil, Table, Indicies: {
 end
 
 export type ServerReplica = Replica.Replica & typeof(setmetatable({} :: Types.ServerReplica, ServerReplica))
+
+local Changes: {[string]: {{ Time: number, Path: any, Value: any }}} = {} :: {[string]: {{ Time: number, Path: any, Value: any }}}
 
 local function NewReplica(Config: Types.ServerConfig): ServerReplica
 	local Parent: Types.ServerReplica? = Config.Parent :: Types.ServerReplica?
@@ -569,8 +564,6 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 		end
 	end)
 
-	local Changes = {}
-
 	self.__Fire = function(Event, Packet)
 		Packet.Id = self.Id
 
@@ -583,21 +576,30 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 		end
 	end
 
-	local function RegisterUpdate(Path, Value, OldData)
-		self.__Change:Fire(Path, Value, self.__OldData)
-		self.__OldData = CopyDeep(OldData)
+	local function RegisterUpdate(Path, Value)
+		local OldData = CopyDeep(self.__OldData)
+		self.__Change:Fire(Path, Value, OldData)
+		self.__OldData = OldData
 
-		local Found = Array.findWhere(Changes, function(ChangeInfo)
-			return Path == ChangeInfo.Path
-		end)
+		if Changes[self.Id] then
+			local Found = Array.findWhere(Changes[self.Id], function(ChangeInfo)
+				return Path == ChangeInfo.Path
+			end)
 
-		if Found and os.clock() > Found.Time then
-			Found.Value = Value
-			Found.Time = os.clock()
-			return
+			local T = tick()
+
+			if Found and T > Found.Time then
+				Found.Value = Value
+				Found.Time = T
+				return
+			end
 		end
 
-		table.insert(Changes, { Time = os.clock(), Path = Path, Value = Value })
+		if not Changes[self.Id] then
+			Changes[self.Id] = {}
+		end
+
+		table.insert(Changes[self.Id], { Time = tick(), Path = Path, Value = Value })
 	end
 
 	if Config.Data then
@@ -626,21 +628,6 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 
 	self.__Ready = true
 	Replicas[self.Id] = self
-
-	self:AddCleanupMethod(task.spawn(function()
-		while true do
-			if self.__Ready and #Changes > 0 then
-				self.__Fire(Net.updateReplica, {
-					Id = self.Id,
-					Changes = Changes,
-				})
-			end
-
-			table.clear(Changes)
-
-			task.wait()
-		end
-	end), true)
 
 	return self
 end
@@ -674,12 +661,15 @@ Net.fireServerEvent.on(function(Player, Packet)
 	end
 end)
 
-game:BindToClose(function()
-	for _, _Replica in pairs(Replicas) do
-		task.defer(_Replica.Destroy, _Replica)
+task.spawn(function() 
+	while task.wait(.1) do
+		if Dictionary.count(Changes) == 0 then
+			continue
+		end
+		
+		Net.updateReplicas.fireAll(Changes)
+		table.clear(Changes)
 	end
-
-	table.clear(Replicas)
 end)
 
 --[=[
