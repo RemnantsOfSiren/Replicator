@@ -8,15 +8,11 @@ local Parent = Replicator.NewReplica({
     IsParent = true,
 })
 
-print(Parent)
-
 local Parent2 = Replicator.NewReplica({
     To = {},
     Name = "Parent2",
     IsParent = true,
 })
-
-print(Parent2)
 
 local Replicas = {}
 
@@ -32,12 +28,7 @@ for I = 1, 20 do
 end
 
 for _, Replica in ipairs(Replicas) do
-    Replica:OnServerEvent(function(Player, ...)
-        print(Player, ...)
-    end)
-
     task.delay(10, function() 
-        Replica:Fire("TestEvent", 1, 2, 3)
         Replica.Data.TestArray:Insert({ 10 })
     end)
 
@@ -46,12 +37,12 @@ for _, Replica in ipairs(Replicas) do
         Replica.Data.TestArray:Remove(3)
     end)
 
-    Replica:AddCleanupMethod(task.spawn(function()
-        while true do
-            Replica.Data.TestArray[1] = { 2 }
-            task.wait()
-        end
-    end), true)
+    -- Replica:AddCleanupMethod(task.spawn(function()
+    --     while true do
+    --         Replica.Data.TestArray[1] = { 2 }
+    --         task.wait()
+    --     end
+    -- end), true)
 end
 
 task.delay(16, function() 
