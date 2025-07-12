@@ -11,6 +11,7 @@ export type ReplicatedTable = typeof(setmetatable({} :: {
     __type: "ReplicatedTable",
     __value: {[any]: any},
     __table: {[any]: any},
+    __oldtable: {[any]: any},
     __signal: typeof(Signal.new()),
     __parent: ReplicatedTable?,
     __updated: boolean,
@@ -105,6 +106,7 @@ CreateReplicatedTable = function(Table: {[any]: any}, Indicies: { string | numbe
     local ReplicatedTable = setmetatable({
         __type = "ReplicatedTable",
         __table = Table,
+        __oldtable = CopyDeep(Table),
         __value = {},
         __signal = if ParentTable then ParentTable.__signal else Signal.new(),
         __parent = ParentTable,
@@ -124,6 +126,7 @@ CreateReplicatedTable = function(Table: {[any]: any}, Indicies: { string | numbe
 			end
 
 			local IsTable = type(Value) == "table"
+            self.__oldtable = CopyDeep(Table)
 
 			if IsTable and Value.__type == "Replicated Table" then
 				rawset(self.__value, Key, Value)

@@ -409,7 +409,6 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 	end
 
 	if Config.Data then
-		self.__OldData = CopyDeep(Config.Data)
 		self.Data = self:AddCleanupMethod(CreateReplicatedTable(Config.Data), "Destroy")
 
 		self:AddCleanupMethod(
@@ -417,6 +416,8 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 				if not Changes[self.Id] then
 					Changes[self.Id] = {}
 				end
+
+				self.__Change:Fire(ReplicatedTable.__indicies, ReplicatedTable:Get(), self.Data.__oldtable)
 
 				local OutterMostUpdated = ReplicatedTable:GetUpdatedAncestor()
 
