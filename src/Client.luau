@@ -244,8 +244,6 @@ local function BatchUpdateReplica(Id: string, Changes: { { Path: { [any]: any },
 		return
 	end
 
-	print(`BatchUpdateReplica: {Id} with {#Changes} changes.`)
-
 	local _Replica = Replicas[Id]
 
 	if not _Replica then
