@@ -1,123 +1,130 @@
 local HttpService = game:GetService("HttpService")
 
-local Sift = require(script.Parent.Parent.Sift)
 local Logger = require(script.Parent.Logger)
+local Sift = require(script.Parent.Parent.Sift)
 local Signal = require(script.Parent.Parent.Signal)
 
 local Dictionary = Sift.Dictionary
 local CopyDeep = Dictionary.copyDeep
 
-export type ReplicatedTable = typeof(setmetatable({} :: {
-    __type: "ReplicatedTable",
-    __value: {[any]: any},
-    __table: {[any]: any},
-    __oldtable: {[any]: any},
-    __signal: typeof(Signal.new()),
-    __parent: ReplicatedTable?,
-    __updated: boolean,
-    __indicies: {string | number}?,
-}, {}))
+export type ReplicatedTable = typeof(setmetatable(
+	{} :: {
+		__type: "ReplicatedTable",
+		__value: { [any]: any },
+		__table: { [any]: any },
+		__oldtable: { [any]: any },
+		__signal: typeof(Signal.new()),
+		__parent: ReplicatedTable?,
+		__updated: boolean,
+		__indicies: { string | number }?,
+	},
+	{}
+))
 
 local ValidKeyTypes = { "string", "number" }
 
 function GetUpdatedAncestor(self: ReplicatedTable): ReplicatedTable
-    local CurrentTable = self
+	local CurrentTable = self
 
-    while CurrentTable.__parent and CurrentTable.__parent.__updated do
-        CurrentTable.__updated = false
-        CurrentTable = CurrentTable.__parent
-    end
-    
-    if CurrentTable.__updated then
-        CurrentTable.__updated = false
-    end
+	while CurrentTable.__parent and CurrentTable.__parent.__updated do
+		CurrentTable.__updated = false
+		CurrentTable = CurrentTable.__parent
+	end
 
-    return CurrentTable
+	if CurrentTable.__updated then
+		CurrentTable.__updated = false
+	end
+
+	return CurrentTable
 end
 
 function GetTop(self: ReplicatedTable): ReplicatedTable
-    local CurrentTable = self
+	local CurrentTable = self
 
-    while CurrentTable.__parent do
-        CurrentTable = CurrentTable.__parent
-    end
+	while CurrentTable.__parent do
+		CurrentTable = CurrentTable.__parent
+	end
 
-    return CurrentTable
+	return CurrentTable
 end
 
 local CreateReplicatedTable
 
 local function Get(self: ReplicatedTable)
-    return CopyDeep(self.__table)
+	return CopyDeep(self.__table)
 end
 
 local function Insert(self: ReplicatedTable, ...: any)
-    local Args = { ... }
-    local InsertIndices = table.clone(self.__indicies or {})
-    local Index = if #Args > 1 then Args[1] else #self.__table + 1
-    local _Value = if #Args > 1 then Args[2] else Args[1]
-    InsertIndices[#InsertIndices + 1] = Index
-    table.insert(self.__table, Index, _Value)
-    if _Value and type(_Value) == "table" then
-        local NewReplicatedTable = CreateReplicatedTable(_Value, InsertIndices, self)
-        rawset(self.__value, Index, NewReplicatedTable)
-    end
-    self.__updated = true
-    self.__signal:Fire(self)
+	local Args = { ... }
+	local InsertIndices = table.clone(self.__indicies or {})
+	local Index = if #Args > 1 then Args[1] else #self.__table + 1
+	local _Value = if #Args > 1 then Args[2] else Args[1]
+	InsertIndices[#InsertIndices + 1] = Index
+	table.insert(self.__table, Index, _Value)
+	if _Value and type(_Value) == "table" then
+		local NewReplicatedTable = CreateReplicatedTable(_Value, InsertIndices, self)
+		rawset(self.__value, Index, NewReplicatedTable)
+	end
+	self.__updated = true
+	self.__signal:Fire(self)
 end
 
 local function Remove(self: ReplicatedTable, Index: number)
-    local _Indicies = table.clone(self.__indicies or {})
-    _Indicies[#_Indicies + 1] = Index
-    local _Value = table.remove(self.__table, Index)
-    if _Value and type(_Value) == "table" then
-        rawset(self.__value, Index, nil)
-    end
-    self.__updated = true
-    self.__signal:Fire(self)
+	local _Indicies = table.clone(self.__indicies or {})
+	_Indicies[#_Indicies + 1] = Index
+	local _Value = table.remove(self.__table, Index)
+	if _Value and type(_Value) == "table" then
+		rawset(self.__value, Index, nil)
+	end
+	self.__updated = true
+	self.__signal:Fire(self)
 end
 
 local function GetChildren(self: ReplicatedTable): { ReplicatedTable }
-    local Tables = {}
+	local Tables = {}
 
-    for _, Value in self.__value do
-        if Value.__type == "ReplicatedTable" then
-            Tables[#Tables + 1] = Value
-        end
-    end
+	for _, Value in self.__value do
+		if Value.__type == "ReplicatedTable" then
+			Tables[#Tables + 1] = Value
+		end
+	end
 
-    return Tables
+	return Tables
 end
 
 local function Destroy(self: ReplicatedTable)
-    for _, Value in self.__value do
-        if Value.__type == "ReplicatedTable" then
-            Value:Destroy()
-        end
-    end
+	for _, Value in self.__value do
+		if Value.__type == "ReplicatedTable" then
+			Value:Destroy()
+		end
+	end
 
-    self.__signal:Destroy()
-    setmetatable(self, nil)
+	self.__signal:Destroy()
+	setmetatable(self, nil)
 end
 
-CreateReplicatedTable = function(Table: {[any]: any}, Indicies: { string | number }?, ParentTable: ReplicatedTable?): ReplicatedTable
-    local Id = HttpService:GenerateGUID(false):sub(1, 6)
+CreateReplicatedTable = function(
+	Table: { [any]: any },
+	Indicies: { string | number }?,
+	ParentTable: ReplicatedTable?
+): ReplicatedTable
+	local Id = HttpService:GenerateGUID(false):sub(1, 6)
 
-    local ReplicatedTable = setmetatable({
-        __type = "ReplicatedTable",
-        __table = Table,
-        __oldtable = CopyDeep(Table),
-        __value = {},
-        __signal = if ParentTable then ParentTable.__signal else Signal.new(),
-        __parent = ParentTable,
-        __updated = false,
-        __indicies = Indicies or {},
-    }, {
-        __index = function(self, Key)
-            return rawget(self.__value, Key) or rawget(Table, Key)
-        end,
+	local ReplicatedTable = setmetatable({
+		__type = "ReplicatedTable",
+		__table = Table,
+		__oldtable = CopyDeep(Table),
+		__value = {},
+		__signal = if ParentTable then ParentTable.__signal else Signal.new(),
+		__parent = ParentTable,
+		__updated = false,
+		__indicies = Indicies or {},
+	}, {
+		__index = function(self, Key)
+			return rawget(self.__value, Key) or rawget(Table, Key)
+		end,
 
-        __newindex = function(self, Key, Value)
+		__newindex = function(self, Key, Value)
 			local validKey = table.find(ValidKeyTypes, typeof(Key))
 
 			if not validKey then
@@ -126,13 +133,10 @@ CreateReplicatedTable = function(Table: {[any]: any}, Indicies: { string | numbe
 			end
 
 			local IsTable = type(Value) == "table"
-            self.__oldtable = CopyDeep(Table)
+			self.__oldtable = self:Get()
 
 			if IsTable and Value.__type == "Replicated Table" then
-				rawset(self.__value, Key, Value)
-                self.__updated = true
-                self.__signal:Fire(self)
-                return
+				return
 			end
 
 			if Sift.Array.is(Table) and Value == nil then
@@ -145,7 +149,7 @@ CreateReplicatedTable = function(Table: {[any]: any}, Indicies: { string | numbe
 					or TValue ~= Value
 				then
 					self.__updated = true
-                    rawset(Table, Key, Value)
+					rawset(Table, Key, Value)
 				end
 			end
 
@@ -153,11 +157,11 @@ CreateReplicatedTable = function(Table: {[any]: any}, Indicies: { string | numbe
 			_Indicies[#_Indicies + 1] = Key
 
 			if self.__updated then
-                self.__signal:Fire(self)
+				self.__signal:Fire(self)
 			end
 
 			if IsTable then
-                local NewReplicatedTable = CreateReplicatedTable(Value, _Indicies, self)
+				local NewReplicatedTable = CreateReplicatedTable(Value, _Indicies, self)
 				rawset(self.__value, Key, NewReplicatedTable)
 			end
 
@@ -172,26 +176,26 @@ CreateReplicatedTable = function(Table: {[any]: any}, Indicies: { string | numbe
 				rawset(self, "Remove", nil :: any)
 				rawset(self, "remove", nil :: any)
 			end
-        end,
+		end,
 
-        __tostring = function()
-            return `[[ReplicatedTable:{Id}]]`
-        end,
-    })
+		__tostring = function()
+			return `[[ReplicatedTable:{Id}]]`
+		end,
+	})
 
-    rawset(ReplicatedTable, "GetUpdatedAncestor", GetUpdatedAncestor)
-    rawset(ReplicatedTable, "getUpdatedAncestor", GetUpdatedAncestor)
+	rawset(ReplicatedTable, "GetUpdatedAncestor", GetUpdatedAncestor)
+	rawset(ReplicatedTable, "getUpdatedAncestor", GetUpdatedAncestor)
 
-    rawset(ReplicatedTable, "GetTop", GetTop)
-    rawset(ReplicatedTable, "getTop", GetTop)
+	rawset(ReplicatedTable, "GetTop", GetTop)
+	rawset(ReplicatedTable, "getTop", GetTop)
 
-    rawset(ReplicatedTable, "Get", Get)
-    rawset(ReplicatedTable, "get", Get)
+	rawset(ReplicatedTable, "Get", Get)
+	rawset(ReplicatedTable, "get", Get)
 
-    rawset(ReplicatedTable, "GetChildren", GetChildren)
-    rawset(ReplicatedTable, "getChildren", GetChildren)
+	rawset(ReplicatedTable, "GetChildren", GetChildren)
+	rawset(ReplicatedTable, "getChildren", GetChildren)
 
-    for Index, Value in Table do
+	for Index, Value in Table do
 		if type(Value) == "table" then
 			if Value.__type and Value.__type == "Replicated Table" then
 				rawset(ReplicatedTable, Index, Value)
@@ -201,17 +205,17 @@ CreateReplicatedTable = function(Table: {[any]: any}, Indicies: { string | numbe
 		end
 	end
 
-    if Sift.Array.is(Table) or Sift.Dictionary.count(Table) == 0 then
-        rawset(ReplicatedTable, "Insert", Insert)
-        rawset(ReplicatedTable, "insert", Insert)
-        rawset(ReplicatedTable, "Remove", Remove)
-        rawset(ReplicatedTable, "remove", Remove)
-    end
+	if Sift.Array.is(Table) or Sift.Dictionary.count(Table) == 0 then
+		rawset(ReplicatedTable, "Insert", Insert)
+		rawset(ReplicatedTable, "insert", Insert)
+		rawset(ReplicatedTable, "Remove", Remove)
+		rawset(ReplicatedTable, "remove", Remove)
+	end
 
-    rawset(ReplicatedTable, "Destroy", Destroy)
-    rawset(ReplicatedTable, "destroy", Destroy)
-    
-    return ReplicatedTable
+	rawset(ReplicatedTable, "Destroy", Destroy)
+	rawset(ReplicatedTable, "destroy", Destroy)
+
+	return ReplicatedTable
 end
 
 return CreateReplicatedTable

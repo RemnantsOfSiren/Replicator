@@ -1,17 +1,21 @@
 --!strict
-local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
 
-local Types = require(script.Parent.Types)
-local Trove = require(script.Parent.Parent.Trove) :: any
-local Signal = require(script.Parent.Parent.Signal) :: any
 local Logger = require(script.Parent.Logger)
 local Parser = require(script.Parent.Parser)
+local Signal = require(script.Parent.Parent.Signal) :: any
+local Trove = require(script.Parent.Parent.Trove) :: any
+local Types = require(script.Parent.Types)
 
 local Replica = {}
 Replica.__index = Replica
 
 export type Replica = typeof(setmetatable({} :: Types.Replica, Replica)) & {}
+
+local function IsReplicatedTable(Value: any): boolean
+	return type(Value) == "table" and Value.__type == "ReplicatedTable"
+end
 
 function Replica:Write(Method: string, Callback: (...any) -> nil)
 	return self.__Write:Connect(function(_Method: string, Args: { any })
@@ -92,13 +96,13 @@ function Replica:ListenToChange(Path: Types.ValidPath, Callback: (...any) -> nil
 
 	Connection = self.__Change:Connect(function(ChangedPath: { string | number }, _, OldValue)
 		local Match = true
-		local Data = self.Data
+		local _Data = if IsReplicatedTable(self.Data) then self.Data:Get() else self.Data
 		local Previous = if not SuppressOld then OldValue else nil
 
 		for Index = 1, #ParsedPath do
 			local Key = ParsedPath[Index]
 			if Key then
-				Data = Data[Key]
+				_Data = _Data[Key]
 
 				if Previous and Previous[Key] then
 					Previous = Previous[Key]
@@ -112,8 +116,8 @@ function Replica:ListenToChange(Path: Types.ValidPath, Callback: (...any) -> nil
 		end
 
 		if Match then
-			task.spawn(Callback, Data, if SuppressOld then nil else Previous)
-			if Data == nil then
+			task.spawn(Callback, _Data, if SuppressOld then nil else Previous)
+			if _Data == nil then
 				Connection:Disconnect()
 			end
 		end
@@ -137,7 +141,7 @@ end
 function Replica:ObserveChange(Path: Types.ValidPath, Callback: (...any) -> nil)
 	local ParsedPath = Parser(Path)
 
-	local _Data = self.Data
+	local _Data = if IsReplicatedTable(self.Data) then self.Data:Get() else self.Data
 
 	for Index = 1, #ParsedPath do
 		local Key = ParsedPath[Index]

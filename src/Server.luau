@@ -7,9 +7,7 @@ local Net = require(script.Parent.Net.Server)
 local Parser = require(script.Parent.Parser)
 local Types = require(script.Parent.Types)
 
-local Array = Sift.Array
 local Dictionary = Sift.Dictionary
-local CopyDeep = Dictionary.copyDeep
 
 local Replicas: { [string]: ServerReplica } = {}
 
