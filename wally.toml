@@ -1,7 +1,7 @@
 [package]
 name = "remnantsofsiren/replicator2"
-version = "1.5.5-experimental"
-#version = "1.4.1"
+version = "1.5.6-experimental"
+#version = "1.4.2"
 registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
 description = "A replication system, that focuses on optimizations. Optimization is primarily done through bytenet, however it can't be as good as it needs to be due to unknown types. This is version 2.0 which aims to remove the need for a :Set function and defers to straight changing of values i.e for example Replica.Data.Currency = 1000 would cause the data to change and replicate said change to the client."
