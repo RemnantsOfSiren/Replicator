@@ -17,6 +17,16 @@ local function IsReplicatedTable(Value: any): boolean
 	return type(Value) == "table" and Value.__type == "ReplicatedTable"
 end
 
+local function IsLooseEqual(ChangedPath, Path)
+	for I = 1, #ChangedPath do
+		if ChangedPath[I] ~= Path[I] then
+			return false
+		end
+	end
+
+	return true
+end
+
 function Replica:Write(Method: string, Callback: (...any) -> nil)
 	return self.__Write:Connect(function(_Method: string, Args: { any })
 		if _Method == Method then
@@ -33,24 +43,12 @@ function Replica:ListenToKeyRemoved(Path: Types.ValidPath, Callback: (...any) ->
 			return
 		end
 
-		local Match = true
-
-		for Index = 1, #ParsedPath do
-			local Key = ParsedPath[Index]
-			if Key then
-				OldValue = OldValue[Key]
-
-				if Key ~= ChangedPath[Index] then
-					Match = false
-					break
-				end
-			end
+		if not IsLooseEqual(ChangedPath, ParsedPath) then
+			return
 		end
 
-		if Match then
-			local Key = ChangedPath[#ChangedPath]
-			task.spawn(Callback, Key, OldValue[Key])
-		end
+		local Key = ChangedPath[#ChangedPath]
+		task.spawn(Callback, Key, OldValue[Key])
 	end)
 end
 
@@ -58,6 +56,10 @@ function Replica:ListenToNewKey(Path: Types.ValidPath, Callback: (...any) -> nil
 	local ParsedPath = Parser(Path)
 
 	return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
+		if not IsLooseEqual(ChangedPath, ParsedPath) then
+			return
+		end
+
 		for Index = 1, #ChangedPath do
 			local Key = ChangedPath[Index]
 			if Key then
@@ -69,23 +71,7 @@ function Replica:ListenToNewKey(Path: Types.ValidPath, Callback: (...any) -> nil
 			return
 		end
 
-		local IsMatch = true
-
-		if #ParsedPath ~= 0 then
-			for Index, Key in pairs(ParsedPath) do
-				local ChangedKey = ChangedPath[Index]
-				if ChangedKey then
-					if Key ~= ChangedKey then
-						IsMatch = false
-						break
-					end
-				end
-			end
-		end
-
-		if IsMatch then
-			task.spawn(Callback, ChangedPath[#ChangedPath], NewValue)
-		end
+		task.spawn(Callback, ChangedPath[#ChangedPath], NewValue)
 	end)
 end
 
@@ -95,7 +81,10 @@ function Replica:ListenToChange(Path: Types.ValidPath, Callback: (...any) -> nil
 	local Connection
 
 	Connection = self.__Change:Connect(function(ChangedPath: { string | number }, _, OldValue)
-		local Match = true
+		if not IsLooseEqual(ChangedPath, ParsedPath) then
+			return
+		end
+
 		local _Data = if IsReplicatedTable(self.Data) then self.Data:Get() else self.Data
 		local Previous = if not SuppressOld then OldValue else nil
 
@@ -107,19 +96,12 @@ function Replica:ListenToChange(Path: Types.ValidPath, Callback: (...any) -> nil
 				if Previous and Previous[Key] then
 					Previous = Previous[Key]
 				end
-
-				if Key ~= ChangedPath[Index] then
-					Match = false
-					break
-				end
 			end
 		end
 
-		if Match then
-			task.spawn(Callback, _Data, if SuppressOld then nil else Previous)
-			if _Data == nil then
-				Connection:Disconnect()
-			end
+		task.spawn(Callback, _Data, if SuppressOld then nil else Previous)
+		if _Data == nil then
+			Connection:Disconnect()
 		end
 	end)
 
