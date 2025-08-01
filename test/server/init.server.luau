@@ -21,6 +21,7 @@ for I = 1, 20 do
         Name = `Test_{I}`,
         Tags = { "Test" },
         Data = {
+            TestString = `Test String {I}`,
             TestArray = { { 1 }, { 2 }, { 3 } },
         },
         Parent = Parent,
@@ -28,27 +29,25 @@ for I = 1, 20 do
 end
 
 for _, Replica in ipairs(Replicas) do
-    task.delay(10, function() 
-        Replica.Data.TestArray:Insert({ 10 })
-    end)
+    Replica.Data.TestArray:Insert({ 10 })
 
-    task.delay(15, function()
-        Replica:SetParent(Parent2)
+    task.delay(2, function()
+        --Replica:SetParent(Parent2)
         Replica.Data.TestArray:Remove(3)
     end)
 
-    Replica:AddCleanupMethod(task.spawn(function()
-        while true do
-            Replica.Data.TestArray[1] = { math.random(1, 1000) }
-            task.wait()
-        end
-    end), true)
+    -- Replica:AddCleanupMethod(task.spawn(function()
+    --     while true do
+    --         Replica.Data.TestString = `Test String {math.random(1, 1000)}`
+    --         task.wait()
+    --     end
+    -- end), true)
 end
 
-task.delay(16, function() 
-    print(Parent2:GetChildren())
-end)
+-- task.delay(16, function() 
+--     print(Parent2:GetChildren())
+-- end)
 
-task.delay(25, function() 
-    Parent2:ReplicateFor(game.Players:GetPlayers()[1])
-end)
+-- task.delay(25, function() 
+--     Parent2:ReplicateFor(game.Players:GetPlayers()[1])
+-- end)

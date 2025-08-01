@@ -15,11 +15,11 @@ export type ClientReplicator = Types.ClientReplicator
 export type ServerReplica = Types.ServerReplica
 export type ClientReplica = Types.ClientReplica
 
-_G.IsExperimentalReplicator = true
+local IsExperimentalReplicator = true
 
 local IsServer = game:GetService("RunService"):IsServer()
 
-if not _G.IsExperimentalReplicator then
+if not IsExperimentalReplicator then
     return (
         if IsServer
             then require(script.Server) :: ServerReplicator

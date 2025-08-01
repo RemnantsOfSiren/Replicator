@@ -352,8 +352,7 @@ local CreateReplicatedTable = require(script.Parent.ReplicatedTable)
 
 export type ServerReplica = Replica.Replica & typeof(setmetatable({} :: Types.ServerReplica, ServerReplica))
 
-local Changes: { [string]: { { Path: { string | number }, Value: any } } } =
-	{} :: { [string]: { { Path: { string | number }, Value: any } } }
+local Changes: Types.Packet = {} :: Types.Packet
 
 local function NewReplica(Config: Types.ServerConfig): ServerReplica
 	local Parent: Types.ServerReplica? = Config.Parent :: Types.ServerReplica?
@@ -415,7 +414,49 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 					Changes[self.Id] = {}
 				end
 
-				self.__Change:Fire(ReplicatedTable.__indicies, ReplicatedTable:Get(), self.Data.__oldtable)
+				local OldData = ReplicatedTable.__oldtable
+				local Data = ReplicatedTable:Get()
+
+				local _Changes = {}
+
+				-- Check for keys removed
+				for Key in OldData do
+					if Data[Key] == nil then
+						table.insert(_Changes, {
+							Key = tostring(Key),
+							Value = nil,
+							IsNumber = type(Key) == "number",
+						})
+
+						local Indicies = table.clone(ReplicatedTable.__indicies or {})
+						Indicies[#Indicies + 1] = Key
+						self.__Change:Fire(Indicies, Data, OldData)
+					end
+				end
+
+				for Key, Value in Data do
+					local IsEqual
+
+					local _OldData = OldData[Key]
+
+					if typeof(_OldData) == "table" and typeof(Value) == "table" then
+						IsEqual = Dictionary.equalsDeep(_OldData, Value)
+					else
+						IsEqual = _OldData == Value
+					end
+
+					if not IsEqual then
+						table.insert(_Changes, {
+							Key = tostring(Key),
+							Value = Value,
+							IsNumber = type(Key) == "number",
+						})
+
+						local Indicies = table.clone(ReplicatedTable.__indicies or {})
+						Indicies[#Indicies + 1] = Key
+						self.__Change:Fire(Indicies, Data, OldData)
+					end
+				end
 
 				local OutterMostUpdated = ReplicatedTable:GetUpdatedAncestor()
 
@@ -425,22 +466,24 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 
 				local Found = false
 
-				for Index, Change in Changes[self.Id] do
+				for _, Change in Changes[self.Id] do
 					if Change.Path == ReplicatedTable.__indicies then
-						Changes[self.Id][Index] = {
+
+						Changes[self.Id] = {
 							Path = ReplicatedTable.__indicies,
-							Value = ReplicatedTable:Get(),
+							Changes = Dictionary.merge(Change.Changes or {}, _Changes or {}),
 						}
+
 						Found = true
 						break
 					end
 				end
 
 				if not Found then
-					table.insert(Changes[self.Id], {
+					Changes[self.Id] = {
 						Path = ReplicatedTable.__indicies,
-						Value = ReplicatedTable:Get(),
-					})
+						Changes = _Changes,
+					}
 				end
 			end),
 			"Disconnect"
@@ -462,8 +505,8 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 		Name = self.Name,
 		Tags = self.Tags,
 		Data = self.Data and self.Data:Get(),
-		WriteLib = self.WriteLib,
 		Parent = Config.Parent and Config.Parent.Id,
+		WriteLib = self.WriteLib,
 	})
 
 	self.__Ready = true
@@ -503,8 +546,10 @@ end)
 
 task.spawn(function()
 	while true do
-		Net.updateReplicas.fireAll(Changes)
-		table.clear(Changes)
+		if Dictionary.count(Changes) > 0 then
+			Net.updateReplicas.fireAll(Changes)
+			table.clear(Changes)
+		end
 		task.wait()
 	end
 end)
