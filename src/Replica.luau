@@ -5,8 +5,12 @@ local RunService = game:GetService("RunService")
 local Logger = require(script.Parent.Logger)
 local Parser = require(script.Parent.Parser)
 local Signal = require(script.Parent.Parent.Signal) :: any
-local Trove = require(script.Parent.Parent.Trove) :: any
 local Types = require(script.Parent.Types)
+local Trove = require(script.Parent.Parent.Trove) :: any
+local Sift = require(script.Parent.Parent.Sift) :: any
+
+local Dictionary = Sift.Dictionary
+local CopyDeep = Dictionary.copyDeep
 
 local Replica = {}
 Replica.__index = Replica
@@ -18,7 +22,7 @@ local function IsReplicatedTable(Value: any): boolean
 end
 
 local function IsLooseEqual(ChangedPath, Path)
-	for I = 1, #ChangedPath do
+	for I = 1, #Path do
 		if ChangedPath[I] ~= Path[I] then
 			return false
 		end
@@ -48,7 +52,7 @@ function Replica:ListenToKeyRemoved(Path: Types.ValidPath, Callback: (...any) ->
 		end
 
 		local Key = ChangedPath[#ChangedPath]
-		task.spawn(Callback, Key, OldValue[Key])
+		task.spawn(Callback, Key, OldValue)
 	end)
 end
 
@@ -79,30 +83,25 @@ function Replica:ListenToChange(Path: Types.ValidPath, Callback: (...any) -> nil
 	local ParsedPath = Parser(Path)
 
 	local Connection
-
-	Connection = self.__Change:Connect(function(ChangedPath: { string | number }, _, OldValue)
+	Connection = self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
 		if not IsLooseEqual(ChangedPath, ParsedPath) then
 			return
 		end
 
-		local _Data = if IsReplicatedTable(self.Data) then self.Data:Get() else self.Data
 		local Previous = if not SuppressOld then OldValue else nil
-
+		
 		for Index = 1, #ParsedPath do
 			local Key = ParsedPath[Index]
 			if Key then
-				_Data = _Data[Key]
-
+				NewValue = NewValue[Key]
+				
 				if Previous and Previous[Key] then
 					Previous = Previous[Key]
 				end
 			end
 		end
-
-		task.spawn(Callback, _Data, if SuppressOld then nil else Previous)
-		if _Data == nil then
-			Connection:Disconnect()
-		end
+		
+		task.spawn(Callback, NewValue, if SuppressOld then nil else Previous)
 	end)
 
 	return Connection
@@ -132,7 +131,8 @@ function Replica:ObserveChange(Path: Types.ValidPath, Callback: (...any) -> nil)
 		end
 	end
 
-	task.spawn(Callback, _Data, nil)
+	task.spawn(Callback, _Data, _Data)
+
 	return self:ListenToChange(Path, Callback, false)
 end
 

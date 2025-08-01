@@ -5,7 +5,6 @@ local Logger = require(script.Parent.Logger)
 local Net = require(script.Parent.Net.Client)
 local Types = require(script.Parent.Types)
 
-local Array = Sift.Array
 local Dictionary = Sift.Dictionary
 local CopyDeep = Dictionary.copyDeep
 
@@ -180,55 +179,69 @@ Net.changeParent.on(function(Info)
 	end
 end)
 
-local function BatchUpdateReplica(Id: string, Changes: { { Path: { [any]: any }, Value: any } })
-	if #Changes == 0 then
-		return
+local function ConvertPacket(PacketKeys, KeysOnly: boolean?)
+	local Packet = {}
+
+	for _, PacketInfo in PacketKeys do
+		if KeysOnly then
+			table.insert(Packet, if PacketInfo.IsNumber then tonumber(PacketInfo.Key) else PacketInfo.Key)
+		else
+			if PacketInfo.IsNumber then
+				table.insert(Packet, {
+					Key = tonumber(PacketInfo.Key),
+					Value = PacketInfo.Value,
+				})
+			else
+				table.insert(Packet, {
+					Key = PacketInfo.Key,
+					Value = PacketInfo.Value,
+				})
+			end
+		end
 	end
 
+	return Packet
+end
+
+local function BatchUpdateReplica(Id: string, Change:  { Path: { [any]: { Key: string, IsNumber: boolean } }, Value: any, Changes: { IsNumber: boolean, Key: string, Value: unknown } })
 	local _Replica = Replicas[Id]
 
 	if not _Replica then
 		return
 	end
 
-	for _, Change in Changes do
-		local Path = Change.Path
-		local Value = Change.Value
-		local _Data = _Replica.Data
+	local Path = ConvertPacket(Change.Path, true)
+	
+	local Data = _Replica.Data
 
-		if not _Data then
-			continue
-		end
+	if not Data then
+		return
+	end
 
-		for I = 1, #Path - 1 do
-			local Key = Path[I]
+	local OldData = CopyDeep(Data)
+
+	for _, Packet in ConvertPacket(Change.Changes) do
+		local _Path = table.clone(Path)
+		_Path[#_Path + 1] = Packet.Key
+		
+		local _Data = Data
+
+		for I = 1, #_Path - 1 do
+			local Key = _Path[I]
 			_Data = _Data[Key]
-
-			if type(_Data) ~= "table" then
-				Logger("Warn", `Replica ({_Replica.Id}) attempting to index a non table value at key {Key}.`)
-			end
-
-			if not _Data then
-				return
-			end
 		end
 
-		if _Data then
-			local LastKey = Path[#Path]
-			local OldData = _Data[LastKey]
-			_Data[LastKey] = Value
-			_Replica.__Change:Fire(Path, Value, OldData)
+		if typeof(_Data) == "table" then
+			_Data[Packet.Key] = Packet.Value
 		end
+	
+		_Replica.__Change:Fire(_Path, Data, OldData)
 	end
 end
 
 Net.updateReplicas.on(function(Data)
-	for Id, Changes in Data do
-		if #Changes == 0 then
-			continue
-		end
-
-		task.spawn(BatchUpdateReplica, Id, Changes)
+	for Id, Change in Data do
+		task.spawn(BatchUpdateReplica, Id, Change)
 	end
 end)
 

@@ -55,6 +55,7 @@ local function Get(self: ReplicatedTable)
 end
 
 local function Insert(self: ReplicatedTable, ...: any)
+	self.__oldtable = self:Get()
 	local Args = { ... }
 	local InsertIndices = table.clone(self.__indicies or {})
 	local Index = if #Args > 1 then Args[1] else #self.__table + 1
@@ -70,6 +71,7 @@ local function Insert(self: ReplicatedTable, ...: any)
 end
 
 local function Remove(self: ReplicatedTable, Index: number)
+	self.__oldtable = self:Get()
 	local _Indicies = table.clone(self.__indicies or {})
 	_Indicies[#_Indicies + 1] = Index
 	local _Value = table.remove(self.__table, Index)
@@ -100,7 +102,20 @@ local function Destroy(self: ReplicatedTable)
 	end
 
 	self.__signal:Destroy()
-	setmetatable(self, nil)
+	table.clear(self)
+end
+
+local function ConvertKeysToPacketKeys(Keys)
+	local PacketKeys = {}
+
+	for _, Key in pairs(Keys) do
+		table.insert(PacketKeys, {
+			IsNumber = type(Key) == "number",
+			Key = tostring(Key),
+		})
+	end
+
+	return PacketKeys
 end
 
 CreateReplicatedTable = function(
@@ -108,7 +123,7 @@ CreateReplicatedTable = function(
 	Indicies: { string | number }?,
 	ParentTable: ReplicatedTable?
 ): ReplicatedTable
-	local Id = HttpService:GenerateGUID(false):sub(1, 6)
+	local Id = HttpService:GenerateGUID(false):sub(1, 7)
 
 	local ReplicatedTable = setmetatable({
 		__type = "ReplicatedTable",
@@ -118,7 +133,7 @@ CreateReplicatedTable = function(
 		__signal = if ParentTable then ParentTable.__signal else Signal.new(),
 		__parent = ParentTable,
 		__updated = false,
-		__indicies = Indicies or {},
+		__indicies = ConvertKeysToPacketKeys(Indicies or {}),
 	}, {
 		__index = function(self, Key)
 			return rawget(self.__value, Key) or rawget(Table, Key)
@@ -180,6 +195,44 @@ CreateReplicatedTable = function(
 
 		__tostring = function()
 			return `[[ReplicatedTable:{Id}]]`
+		end,
+
+		__iter = function(self)
+			local AlreadyVisited = {}
+			local Cleaner = {}
+
+			return function(): (any, any, any)
+				for Index, Value in pairs(Table) do
+					if not table.find(AlreadyVisited, Index) then
+						table.insert(AlreadyVisited, Index)
+
+						local _Indicies = table.clone(Indicies or {})
+						_Indicies[#_Indicies + 1] = Index
+						Value = if type(Value) == "table"
+							then CreateReplicatedTable(Value, _Indicies, self)
+							else Value
+
+						return Index,
+							Value,
+							function(NewValue)
+								local IsReplicatedTable = type(NewValue) == "table"
+									and NewValue.__type
+									and NewValue.__type == "Replicated Table"
+
+								if IsReplicatedTable then
+									rawset(Table, Index, NewValue:Get())
+									rawset(self.__value, Index, NewValue)	
+								else
+									rawset(Table, Index, NewValue)
+								end
+							end
+					end
+				end
+
+				table.clear(Cleaner)
+				table.clear(AlreadyVisited)
+				return nil, nil, nil
+			end
 		end,
 	})
 

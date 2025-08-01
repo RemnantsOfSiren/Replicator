@@ -154,9 +154,12 @@ local Queue: any = {
 Queue.Reliable[2] = table.create(256)
 Queue.Reliable[7] = table.create(256)
 export type unknownArray = {[number]: any}
+export type key = { Key: string, IsNumber: boolean }
+export type keyArray = {[number]: any}
+export type packet = { Key: string, Value: any?, IsNumber: boolean }
+export type changeArray = {[number]: { Key: string, Value: any?, IsNumber: boolean }}
 export type replica = { Id: string, Name: string, Tags: any?, Data: any?, Parent: string?, WriteLib: Instance?, IsParent: boolean? }
-export type replicaChange = { Path: {[number]: any}, Value: any? }
-export type arrayOfChanges = {[number]: { Path: {[number]: any}, Value: any? }}
+export type replicaChange = { Path: {[number]: any}, Changes: {[number]: { Key: string, Value: any?, IsNumber: boolean }} }
 local function WriteEVENT_createReplica(Value: { Id: string, Name: string, Tags: any?, Data: any?, Parent: string?, WriteLib: Instance?, IsParent: boolean? }): ()
 	-- Allocate BLOCK: 9 bytes
 	local BLOCK_START = Allocate(9)
@@ -195,7 +198,7 @@ local function WriteEVENT_createReplica(Value: { Id: string, Name: string, Tags:
 	end
 end
 
-local function WriteEVENT_updateReplicas(Value: {[string]: {[number]: { Path: {[number]: any}, Value: any? }}}): ()
+local function WriteEVENT_updateReplicas(Value: {[string]: { Path: {[number]: any}, Changes: {[number]: { Key: string, Value: any?, IsNumber: boolean }} }}): ()
 	-- Allocate BLOCK: 3 bytes
 	local BLOCK_START = Allocate(3)
 	buffer.writeu8(SendBuffer, BLOCK_START + 0, 1)
@@ -209,26 +212,33 @@ local function WriteEVENT_updateReplicas(Value: {[string]: {[number]: { Path: {[
 		buffer.writestring(SendBuffer, SendOffset, Key_1, Length)
 		local OFFSET_1 = Allocate(2)
 		local Elements_2 = 0
-		for Key_2, Element_2 in Element_1 do
+		for Key_2, Element_2 in Element_1.Path do
 			Elements_2 += 1
 			local OFFSET_0 = Allocate(1)
 			buffer.writeu8(SendBuffer, OFFSET_0, Key_2)
+			table.insert(SendInstances, Element_2 or Null)
+		end
+		buffer.writeu16(SendBuffer, OFFSET_1, Elements_2)
+		local OFFSET_2 = Allocate(2)
+		local Elements_2 = 0
+		for Key_2, Element_2 in Element_1.Changes do
+			Elements_2 += 1
+			local OFFSET_0 = Allocate(1)
+			buffer.writeu8(SendBuffer, OFFSET_0, Key_2)
+			local Length = #Element_2.Key
 			local OFFSET_1 = Allocate(2)
-			local Elements_3 = 0
-			for Key_3, Element_3 in Element_2.Path do
-				Elements_3 += 1
-				local OFFSET_0 = Allocate(1)
-				buffer.writeu8(SendBuffer, OFFSET_0, Key_3)
-				table.insert(SendInstances, Element_3 or Null)
-			end
-			buffer.writeu16(SendBuffer, OFFSET_1, Elements_3)
+			buffer.writeu16(SendBuffer, OFFSET_1, Length)
+			Allocate(Length)
+			buffer.writestring(SendBuffer, SendOffset, Element_2.Key, Length)
 			local OFFSET_2 = Allocate(1)
 			buffer.writeu8(SendBuffer, OFFSET_2, Element_2.Value ~= nil and 1 or 0)
 			if Element_2.Value ~= nil then
 				table.insert(SendInstances, Element_2.Value or Null)
 			end
+			local OFFSET_3 = Allocate(1)
+			buffer.writeu8(SendBuffer, OFFSET_3, Element_2.IsNumber and 1 or 0)
 		end
-		buffer.writeu16(SendBuffer, OFFSET_1, Elements_2)
+		buffer.writeu16(SendBuffer, OFFSET_2, Elements_2)
 	end
 	buffer.writeu16(SendBuffer, BLOCK_START + 1, Elements_1)
 end
@@ -307,7 +317,7 @@ local function WriteEVENT_destroyReplica(Value: string): ()
 	buffer.writestring(SendBuffer, SendOffset, Value, Length)
 end
 
-local function WriteEVENT_replicaWrite(Value: { Id: string, Method: string, Args: {[number]: any}? }): ()
+local function WriteEVENT_replicaWrite(Value: { Id: string, Args: {[number]: any}?, Method: string }): ()
 	-- Allocate BLOCK: 6 bytes
 	local BLOCK_START = Allocate(6)
 	buffer.writeu8(SendBuffer, BLOCK_START + 0, 6)
@@ -315,11 +325,7 @@ local function WriteEVENT_replicaWrite(Value: { Id: string, Method: string, Args
 	buffer.writeu16(SendBuffer, BLOCK_START + 1, Length)
 	Allocate(Length)
 	buffer.writestring(SendBuffer, SendOffset, Value.Id, Length)
-	local Length = #Value.Method
-	buffer.writeu16(SendBuffer, BLOCK_START + 3, Length)
-	Allocate(Length)
-	buffer.writestring(SendBuffer, SendOffset, Value.Method, Length)
-	buffer.writeu8(SendBuffer, BLOCK_START + 5, Value.Args ~= nil and 1 or 0)
+	buffer.writeu8(SendBuffer, BLOCK_START + 3, Value.Args ~= nil and 1 or 0)
 	if Value.Args ~= nil then
 		-- Allocate BLOCK: 2 bytes
 		local BLOCK_START = Allocate(2)
@@ -332,6 +338,10 @@ local function WriteEVENT_replicaWrite(Value: { Id: string, Method: string, Args
 		end
 		buffer.writeu16(SendBuffer, BLOCK_START + 0, Elements_2)
 	end
+	local Length = #Value.Method
+	buffer.writeu16(SendBuffer, BLOCK_START + 4, Length)
+	Allocate(Length)
+	buffer.writestring(SendBuffer, SendOffset, Value.Method, Length)
 end
 
 local function ReadFUNCTION_DATA_getInitialReplicas(): (nil)
@@ -339,13 +349,13 @@ local function ReadFUNCTION_DATA_getInitialReplicas(): (nil)
 end
 
 local function WriteFUNCTION_RETURN_getInitialReplicas(Value: { { Id: string, Name: string, Tags: any?, Data: any?, Parent: string?, WriteLib: Instance?, IsParent: boolean? } }, InvocationIdentifier: number): ()
-	-- Allocate BLOCK: 4 bytes
-	local BLOCK_START = Allocate(4)
+	-- Allocate BLOCK: 5 bytes
+	local BLOCK_START = Allocate(5)
 	buffer.writeu8(SendBuffer, BLOCK_START + 0, 7)
 	buffer.writeu8(SendBuffer, BLOCK_START + 1, InvocationIdentifier)
 	buffer.writeu8(SendBuffer, BLOCK_START + 2, 1)
 	-- START ARRAY
-	buffer.writeu8(SendBuffer, BLOCK_START + 3, #Value)
+	buffer.writeu16(SendBuffer, BLOCK_START + 3, #Value)
 		-- Allocate BLOCK: 8 bytes
 	local ARRAY_START_1 = Allocate(8 * #Value)
 	for Index = 1, #Value do
@@ -596,12 +606,12 @@ local Returns = table.freeze({
 		end,
 	},
 	updateReplicas = {
-		fire = function(Player: Player, Value: {[string]: {[number]: { Path: {[number]: any}, Value: any? }}}): ()
+		fire = function(Player: Player, Value: {[string]: { Path: {[number]: any}, Changes: {[number]: { Key: string, Value: any?, IsNumber: boolean }} }}): ()
 			Load(PlayersMap[Player])
 			WriteEVENT_updateReplicas(Value)
 			PlayersMap[Player] = Save()
 		end,
-		fireAll = function(Value: {[string]: {[number]: { Path: {[number]: any}, Value: any? }}}): ()
+		fireAll = function(Value: {[string]: { Path: {[number]: any}, Changes: {[number]: { Key: string, Value: any?, IsNumber: boolean }} }}): ()
 			Load()
 			WriteEVENT_updateReplicas(Value)
 			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
@@ -613,7 +623,7 @@ local Returns = table.freeze({
 				PlayersMap[Player] = Save()
 			end
 		end,
-		fireList = function(List: {Player}, Value: {[string]: {[number]: { Path: {[number]: any}, Value: any? }}}): ()
+		fireList = function(List: {Player}, Value: {[string]: { Path: {[number]: any}, Changes: {[number]: { Key: string, Value: any?, IsNumber: boolean }} }}): ()
 			Load()
 			WriteEVENT_updateReplicas(Value)
 			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
@@ -625,7 +635,7 @@ local Returns = table.freeze({
 				PlayersMap[Player] = Save()
 			end
 		end,
-		fireExcept = function(Except: Player, Value: {[string]: {[number]: { Path: {[number]: any}, Value: any? }}}): ()
+		fireExcept = function(Except: Player, Value: {[string]: { Path: {[number]: any}, Changes: {[number]: { Key: string, Value: any?, IsNumber: boolean }} }}): ()
 			Load()
 			WriteEVENT_updateReplicas(Value)
 			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
@@ -792,12 +802,12 @@ local Returns = table.freeze({
 		end,
 	},
 	replicaWrite = {
-		fire = function(Player: Player, Value: { Id: string, Method: string, Args: {[number]: any}? }): ()
+		fire = function(Player: Player, Value: { Id: string, Args: {[number]: any}?, Method: string }): ()
 			Load(PlayersMap[Player])
 			WriteEVENT_replicaWrite(Value)
 			PlayersMap[Player] = Save()
 		end,
-		fireAll = function(Value: { Id: string, Method: string, Args: {[number]: any}? }): ()
+		fireAll = function(Value: { Id: string, Args: {[number]: any}?, Method: string }): ()
 			Load()
 			WriteEVENT_replicaWrite(Value)
 			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
@@ -809,7 +819,7 @@ local Returns = table.freeze({
 				PlayersMap[Player] = Save()
 			end
 		end,
-		fireList = function(List: {Player}, Value: { Id: string, Method: string, Args: {[number]: any}? }): ()
+		fireList = function(List: {Player}, Value: { Id: string, Args: {[number]: any}?, Method: string }): ()
 			Load()
 			WriteEVENT_replicaWrite(Value)
 			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
@@ -821,7 +831,7 @@ local Returns = table.freeze({
 				PlayersMap[Player] = Save()
 			end
 		end,
-		fireExcept = function(Except: Player, Value: { Id: string, Method: string, Args: {[number]: any}? }): ()
+		fireExcept = function(Except: Player, Value: { Id: string, Args: {[number]: any}?, Method: string }): ()
 			Load()
 			WriteEVENT_replicaWrite(Value)
 			local Buffer, Size, Instances = SendBuffer, SendCursor, SendInstances
