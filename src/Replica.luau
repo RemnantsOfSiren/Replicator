@@ -5,12 +5,8 @@ local RunService = game:GetService("RunService")
 local Logger = require(script.Parent.Logger)
 local Parser = require(script.Parent.Parser)
 local Signal = require(script.Parent.Parent.Signal) :: any
-local Types = require(script.Parent.Types)
 local Trove = require(script.Parent.Parent.Trove) :: any
-local Sift = require(script.Parent.Parent.Sift) :: any
-
-local Dictionary = Sift.Dictionary
-local CopyDeep = Dictionary.copyDeep
+local Types = require(script.Parent.Types)
 
 local Replica = {}
 Replica.__index = Replica
@@ -89,18 +85,18 @@ function Replica:ListenToChange(Path: Types.ValidPath, Callback: (...any) -> nil
 		end
 
 		local Previous = if not SuppressOld then OldValue else nil
-		
+
 		for Index = 1, #ParsedPath do
 			local Key = ParsedPath[Index]
 			if Key then
 				NewValue = NewValue[Key]
-				
+
 				if Previous and Previous[Key] then
 					Previous = Previous[Key]
 				end
 			end
 		end
-		
+
 		task.spawn(Callback, NewValue, if SuppressOld then nil else Previous)
 	end)
 
@@ -148,7 +144,7 @@ function Replica.new(Config: Types.Config): Replica
 	local Cleaner = Trove.new()
 
 	local self = setmetatable({
-		Id = if RunService:IsServer() then `{Config.Name}:{HttpService:GenerateGUID(false)}` else Config.Id,
+		Id = if RunService:IsServer() then `{Config.Name}:{HttpService:GenerateGUID(false):sub(1, 7)}` else Config.Id,
 		To = if RunService:IsServer() then Config.To else nil,
 		Name = Config.Name,
 		Tags = Config.Tags,

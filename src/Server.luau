@@ -352,7 +352,7 @@ local CreateReplicatedTable = require(script.Parent.ReplicatedTable)
 
 export type ServerReplica = Replica.Replica & typeof(setmetatable({} :: Types.ServerReplica, ServerReplica))
 
-local Changes: Types.Packet = {} :: Types.Packet
+--local Changes: Types.Packet = {} :: Types.Packet
 
 local function NewReplica(Config: Types.ServerConfig): ServerReplica
 	local Parent: Types.ServerReplica? = Config.Parent :: Types.ServerReplica?
@@ -409,82 +409,8 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 		self.Data = self:AddCleanupMethod(CreateReplicatedTable(Config.Data), "Destroy")
 
 		self:AddCleanupMethod(
-			self.Data.__signal:Connect(function(ReplicatedTable)
-				if not Changes[self.Id] then
-					Changes[self.Id] = {}
-				end
-
-				local OldData = ReplicatedTable.__oldtable
-				local Data = ReplicatedTable:Get()
-
-				local _Changes = {}
-
-				-- Check for keys removed
-				for Key in OldData do
-					if Data[Key] == nil then
-						table.insert(_Changes, {
-							Key = tostring(Key),
-							Value = nil,
-							IsNumber = type(Key) == "number",
-						})
-
-						local Indicies = table.clone(ReplicatedTable.__indicies or {})
-						Indicies[#Indicies + 1] = Key
-						self.__Change:Fire(Indicies, Data, OldData)
-					end
-				end
-
-				for Key, Value in Data do
-					local IsEqual
-
-					local _OldData = OldData[Key]
-
-					if typeof(_OldData) == "table" and typeof(Value) == "table" then
-						IsEqual = Dictionary.equalsDeep(_OldData, Value)
-					else
-						IsEqual = _OldData == Value
-					end
-
-					if not IsEqual then
-						table.insert(_Changes, {
-							Key = tostring(Key),
-							Value = Value,
-							IsNumber = type(Key) == "number",
-						})
-
-						local Indicies = table.clone(ReplicatedTable.__indicies or {})
-						Indicies[#Indicies + 1] = Key
-						self.__Change:Fire(Indicies, Data, OldData)
-					end
-				end
-
-				local OutterMostUpdated = ReplicatedTable:GetUpdatedAncestor()
-
-				if OutterMostUpdated ~= ReplicatedTable then
-					ReplicatedTable = OutterMostUpdated
-				end
-
-				local Found = false
-
-				for _, Change in Changes[self.Id] do
-					if Change.Path == ReplicatedTable.__indicies then
-
-						Changes[self.Id] = {
-							Path = ReplicatedTable.__indicies,
-							Changes = Dictionary.merge(Change.Changes or {}, _Changes or {}),
-						}
-
-						Found = true
-						break
-					end
-				end
-
-				if not Found then
-					Changes[self.Id] = {
-						Path = ReplicatedTable.__indicies,
-						Changes = _Changes,
-					}
-				end
+			self.Data.__signal:Connect(function(Path)
+				self.__Change:Fire(Path, self.Data:Get(), self.Data.__oldtable)
 			end),
 			"Disconnect"
 		)
@@ -546,10 +472,24 @@ end)
 
 task.spawn(function()
 	while true do
+		local Changes = {}
+
+		for _, _Replica in Replicas do
+			if not _Replica.__Ready or not _Replica.Data then
+				continue
+			end
+
+			local ReplicaChanges = _Replica.Data:GetAllChanges()
+
+			if ReplicaChanges and #ReplicaChanges > 0 then
+				Changes[_Replica.Id] = ReplicaChanges
+			end
+		end
+
 		if Dictionary.count(Changes) > 0 then
 			Net.updateReplicas.fireAll(Changes)
-			table.clear(Changes)
 		end
+
 		task.wait()
 	end
 end)

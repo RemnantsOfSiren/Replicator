@@ -4,6 +4,8 @@ local Logger = require(script.Parent.Logger)
 local Sift = require(script.Parent.Parent.Sift)
 local Signal = require(script.Parent.Parent.Signal)
 
+local Serializer = require(script.Parent.Serializer)
+
 local Dictionary = Sift.Dictionary
 local CopyDeep = Dictionary.copyDeep
 
@@ -12,11 +14,26 @@ export type ReplicatedTable = typeof(setmetatable(
 		__type: "ReplicatedTable",
 		__value: { [any]: any },
 		__table: { [any]: any },
-		__oldtable: { [any]: any },
 		__signal: typeof(Signal.new()),
 		__parent: ReplicatedTable?,
 		__updated: boolean,
+		__changes: { [any]: { Path: { string | number }, Value: any, Action: string } },
+		__oldtable: { [any]: any },
 		__indicies: { string | number }?,
+		get: (self: ReplicatedTable) -> { [any]: any },
+		Get: (self: ReplicatedTable) -> { [any]: any },
+		getTop: (self: ReplicatedTable) -> ReplicatedTable,
+		GetTop: (self: ReplicatedTable) -> ReplicatedTable,
+		insert: (self: ReplicatedTable, ...any) -> nil,
+		Insert: (self: ReplicatedTable, ...any) -> nil,
+		remove: (self: ReplicatedTable, Index: number) -> nil,
+		Remove: (self: ReplicatedTable, Index: number) -> nil,
+		destroy: (self: ReplicatedTable) -> nil,
+		Destroy: (self: ReplicatedTable) -> nil,
+		getChildren: (self: ReplicatedTable) -> { ReplicatedTable },
+		GetChildren: (self: ReplicatedTable) -> { ReplicatedTable },
+		getUpdatedAncestor: (self: ReplicatedTable) -> ReplicatedTable,
+		GetUpdatedAncestor: (self: ReplicatedTable) -> ReplicatedTable,
 	},
 	{}
 ))
@@ -62,6 +79,16 @@ local function Insert(self: ReplicatedTable, ...: any)
 	local _Value = if #Args > 1 then Args[2] else Args[1]
 	InsertIndices[#InsertIndices + 1] = Index
 	table.insert(self.__table, Index, _Value)
+
+	local Path = table.clone(self.__indicies or {})
+	Path[#Path + 1] = Index
+
+	table.insert(self.__changes, {
+		Path = Serializer.ConvertToPacket(Path),
+		Value = _Value,
+		Action = "Insert",
+	})
+
 	if _Value and type(_Value) == "table" then
 		local NewReplicatedTable = CreateReplicatedTable(_Value, InsertIndices, self)
 		rawset(self.__value, Index, NewReplicatedTable)
@@ -75,6 +102,16 @@ local function Remove(self: ReplicatedTable, Index: number)
 	local _Indicies = table.clone(self.__indicies or {})
 	_Indicies[#_Indicies + 1] = Index
 	local _Value = table.remove(self.__table, Index)
+
+	local Path = table.clone(self.__indicies or {})
+	Path[#Path + 1] = Index
+
+	table.insert(self.__changes, {
+		Path = Serializer.ConvertToPacket(Path),
+		Value = _Value,
+		Action = "Remove",
+	})
+
 	if _Value and type(_Value) == "table" then
 		rawset(self.__value, Index, nil)
 	end
@@ -105,17 +142,19 @@ local function Destroy(self: ReplicatedTable)
 	table.clear(self)
 end
 
-local function ConvertKeysToPacketKeys(Keys)
-	local PacketKeys = {}
+local function RecursivelyGetChanges(self: ReplicatedTable)
+	local Changes = CopyDeep(self.__changes)
 
-	for _, Key in pairs(Keys) do
-		table.insert(PacketKeys, {
-			IsNumber = type(Key) == "number",
-			Key = tostring(Key),
-		})
+	for _, Value in self:GetChildren() do
+		local ChildChanges = RecursivelyGetChanges(Value)
+		for _, Change in ChildChanges do
+			table.insert(Changes, Change)
+		end
 	end
 
-	return PacketKeys
+	table.clear(self.__changes)
+
+	return Changes
 end
 
 CreateReplicatedTable = function(
@@ -128,12 +167,13 @@ CreateReplicatedTable = function(
 	local ReplicatedTable = setmetatable({
 		__type = "ReplicatedTable",
 		__table = Table,
-		__oldtable = CopyDeep(Table),
 		__value = {},
 		__signal = if ParentTable then ParentTable.__signal else Signal.new(),
 		__parent = ParentTable,
 		__updated = false,
-		__indicies = ConvertKeysToPacketKeys(Indicies or {}),
+		__changes = {},
+		__oldtable = CopyDeep(Table),
+		__indicies = Indicies or {},
 	}, {
 		__index = function(self, Key)
 			return rawget(self.__value, Key) or rawget(Table, Key)
@@ -165,6 +205,15 @@ CreateReplicatedTable = function(
 				then
 					self.__updated = true
 					rawset(Table, Key, Value)
+
+					local Path = table.clone(self.__indicies or {})
+					Path[#Path + 1] = Key
+
+					table.insert(self.__changes, {
+						Path = Serializer.ConvertToPacket(Path),
+						Value = Value,
+						Action = "Set",
+					})
 				end
 			end
 
@@ -172,7 +221,7 @@ CreateReplicatedTable = function(
 			_Indicies[#_Indicies + 1] = Key
 
 			if self.__updated then
-				self.__signal:Fire(self)
+				self.__signal:Fire(_Indicies, Table, self.__oldtable)
 			end
 
 			if IsTable then
@@ -208,9 +257,7 @@ CreateReplicatedTable = function(
 
 						local _Indicies = table.clone(Indicies or {})
 						_Indicies[#_Indicies + 1] = Index
-						Value = if type(Value) == "table"
-							then CreateReplicatedTable(Value, _Indicies, self)
-							else Value
+						Value = if type(Value) == "table" then CreateReplicatedTable(Value, _Indicies, self) else Value
 
 						return Index,
 							Value,
@@ -221,7 +268,7 @@ CreateReplicatedTable = function(
 
 								if IsReplicatedTable then
 									rawset(Table, Index, NewValue:Get())
-									rawset(self.__value, Index, NewValue)	
+									rawset(self.__value, Index, NewValue)
 								else
 									rawset(Table, Index, NewValue)
 								end
@@ -267,6 +314,10 @@ CreateReplicatedTable = function(
 
 	rawset(ReplicatedTable, "Destroy", Destroy)
 	rawset(ReplicatedTable, "destroy", Destroy)
+
+	rawset(ReplicatedTable, "GetAllChanges", function(self: ReplicatedTable)
+		return RecursivelyGetChanges(self)
+	end)
 
 	return ReplicatedTable
 end
