@@ -73,23 +73,20 @@ export type ClientReplica = Replica & {
 	Destroy: (self: ClientReplica) -> nil,
 }
 
-
 type packetKey = {
 	Key: string,
 	IsNumber: boolean,
 }
 
 type changePacket = packetKey & {
-	Value: unknown,
+	Value: unknown?,
+	Action: string?,
 }
 
 export type Packet = {
 	Id: string,
 	Changes: {
-		[number]: { 
-			Path: { packetKey }, 
-			Changes: changePacket, 
-		},
+		[number]: changePacket,
 	},
 }
 

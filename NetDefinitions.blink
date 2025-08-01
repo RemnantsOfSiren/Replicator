@@ -10,15 +10,16 @@ struct key {
     IsNumber: boolean
 }
 
-map keyArray = { [u8]: unknown }
+map keyArray = { [u8]: key }
 
 struct packet {
-    Key: string,
+    Path: keyArray,
     Value: unknown?,
+    Action: string?,
     IsNumber: boolean,
 }
 
-map changeArray = { [u8]: packet }
+map arrayOfChanges = { [u8]: packet }
 
 struct replica {
     Id: string,
@@ -30,10 +31,6 @@ struct replica {
     IsParent: boolean?
 }
 
-struct replicaChange {
-    Path: keyArray,
-    Changes: changeArray
-}
 
 event createReplica {
     From: Server,
@@ -46,7 +43,7 @@ event updateReplicas {
     From: Server,
     Type: Reliable,
     Call: SingleSync,
-    Data: map { [string]: replicaChange } 
+    Data: map { [string]: arrayOfChanges } 
 }
 
 event fireServerEvent {

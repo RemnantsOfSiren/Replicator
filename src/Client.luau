@@ -4,6 +4,7 @@ local Sift = require(script.Parent.Parent.Sift) :: any
 local Logger = require(script.Parent.Logger)
 local Net = require(script.Parent.Net.Client)
 local Types = require(script.Parent.Types)
+local Serializer = require(script.Parent.Serializer)
 
 local Dictionary = Sift.Dictionary
 local CopyDeep = Dictionary.copyDeep
@@ -179,39 +180,13 @@ Net.changeParent.on(function(Info)
 	end
 end)
 
-local function ConvertPacket(PacketKeys, KeysOnly: boolean?)
-	local Packet = {}
-
-	for _, PacketInfo in PacketKeys do
-		if KeysOnly then
-			table.insert(Packet, if PacketInfo.IsNumber then tonumber(PacketInfo.Key) else PacketInfo.Key)
-		else
-			if PacketInfo.IsNumber then
-				table.insert(Packet, {
-					Key = tonumber(PacketInfo.Key),
-					Value = PacketInfo.Value,
-				})
-			else
-				table.insert(Packet, {
-					Key = PacketInfo.Key,
-					Value = PacketInfo.Value,
-				})
-			end
-		end
-	end
-
-	return Packet
-end
-
-local function BatchUpdateReplica(Id: string, Change:  { Path: { [any]: { Key: string, IsNumber: boolean } }, Value: any, Changes: { IsNumber: boolean, Key: string, Value: unknown } })
+local function BatchUpdateReplica(Id, Changes)
 	local _Replica = Replicas[Id]
 
 	if not _Replica then
 		return
 	end
 
-	local Path = ConvertPacket(Change.Path, true)
-	
 	local Data = _Replica.Data
 
 	if not Data then
@@ -220,10 +195,9 @@ local function BatchUpdateReplica(Id: string, Change:  { Path: { [any]: { Key: s
 
 	local OldData = CopyDeep(Data)
 
-	for _, Packet in ConvertPacket(Change.Changes) do
-		local _Path = table.clone(Path)
-		_Path[#_Path + 1] = Packet.Key
-		
+	for _, Packet in Changes do
+		local _Path = Serializer.ConvertToPath(Packet.Path)
+
 		local _Data = Data
 
 		for I = 1, #_Path - 1 do
@@ -231,10 +205,14 @@ local function BatchUpdateReplica(Id: string, Change:  { Path: { [any]: { Key: s
 			_Data = _Data[Key]
 		end
 
-		if typeof(_Data) == "table" then
-			_Data[Packet.Key] = Packet.Value
+		if Packet.Action == "Set" then
+			_Data[_Path[#_Path]] = Packet.Value
+		elseif Packet.Action == "Remove" then
+			table.remove(_Data, _Path[#_Path])
+		elseif Packet.Action == "Insert" then
+			table.insert(_Data, Packet.Value)
 		end
-	
+
 		_Replica.__Change:Fire(_Path, Data, OldData)
 	end
 end
