@@ -39,15 +39,23 @@ function Replica:ListenToKeyRemoved(Path: Types.ValidPath, Callback: (...any) ->
 	local ParsedPath = Parser(Path)
 
 	return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
-		if NewValue then
-			return
-		end
-
 		if not IsLooseEqual(ChangedPath, ParsedPath) then
 			return
 		end
 
-		local Key = ChangedPath[#ChangedPath]
+		for Index = 1, #ParsedPath do
+			local Key = ParsedPath[Index]
+			if Key then
+				NewValue = NewValue[Key]
+				OldValue = OldValue[Key]
+			end
+		end
+
+		if NewValue then
+			return
+		end
+
+		local Key = ParsedPath[#ParsedPath]
 		task.spawn(Callback, Key, OldValue)
 	end)
 end
@@ -60,9 +68,10 @@ function Replica:ListenToNewKey(Path: Types.ValidPath, Callback: (...any) -> nil
 			return
 		end
 
-		for Index = 1, #ChangedPath do
-			local Key = ChangedPath[Index]
+		for Index = 1, #ParsedPath do
+			local Key = ParsedPath[Index]
 			if Key then
+				NewValue = NewValue[Key]
 				OldValue = OldValue[Key]
 			end
 		end
@@ -71,15 +80,15 @@ function Replica:ListenToNewKey(Path: Types.ValidPath, Callback: (...any) -> nil
 			return
 		end
 
-		task.spawn(Callback, ChangedPath[#ChangedPath], NewValue)
+		local Index = ChangedPath[#ParsedPath]
+		task.spawn(Callback, Index, NewValue)
 	end)
 end
 
 function Replica:ListenToChange(Path: Types.ValidPath, Callback: (...any) -> nil, SuppressOld: boolean?)
 	local ParsedPath = Parser(Path)
 
-	local Connection
-	Connection = self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
+	return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
 		if not IsLooseEqual(ChangedPath, ParsedPath) then
 			return
 		end
@@ -99,8 +108,6 @@ function Replica:ListenToChange(Path: Types.ValidPath, Callback: (...any) -> nil
 
 		task.spawn(Callback, NewValue, if SuppressOld then nil else Previous)
 	end)
-
-	return Connection
 end
 
 function Replica:ListenToRaw(Callback: (...any) -> nil)
