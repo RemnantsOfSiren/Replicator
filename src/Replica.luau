@@ -43,8 +43,12 @@ function Replica:ListenToKeyRemoved(Path: Types.ValidPath, Callback: (...any) ->
 			return
 		end
 
-		for Index = 1, #ParsedPath do
-			local Key = ParsedPath[Index]
+		if #ChangedPath < #ParsedPath + 1 then
+			return
+		end
+
+		for Index = 1, #ParsedPath + 1 do
+			local Key = ChangedPath[Index]
 			if Key then
 				NewValue = NewValue[Key]
 				OldValue = OldValue[Key]
@@ -55,7 +59,7 @@ function Replica:ListenToKeyRemoved(Path: Types.ValidPath, Callback: (...any) ->
 			return
 		end
 
-		local Key = ParsedPath[#ParsedPath]
+		local Key = ChangedPath[#ParsedPath + 1]
 		task.spawn(Callback, Key, OldValue)
 	end)
 end
@@ -68,8 +72,12 @@ function Replica:ListenToNewKey(Path: Types.ValidPath, Callback: (...any) -> nil
 			return
 		end
 
-		for Index = 1, #ParsedPath do
-			local Key = ParsedPath[Index]
+		if #ChangedPath < #ParsedPath + 1 then
+			return
+		end
+
+		for Index = 1, #ParsedPath + 1 do
+			local Key = ChangedPath[Index]
 			if Key then
 				NewValue = NewValue[Key]
 				OldValue = OldValue[Key]
@@ -80,8 +88,7 @@ function Replica:ListenToNewKey(Path: Types.ValidPath, Callback: (...any) -> nil
 			return
 		end
 
-		local Index = ChangedPath[#ParsedPath]
-		task.spawn(Callback, Index, NewValue)
+		task.spawn(Callback, ChangedPath[#ParsedPath + 1], NewValue)
 	end)
 end
 
