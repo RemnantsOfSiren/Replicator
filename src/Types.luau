@@ -1,59 +1,92 @@
 local Trove = require(script.Parent.Parent.Trove) :: any
 local Signal = require(script.Parent.Parent.Signal) :: any
 
+type Signal = typeof(Signal.new())
+type Cleaner = typeof(Trove.new())
+
 export type ValidPath = { string | number } | string | number
 export type ToOptions = { Player } | Player | "All"
+
 export type Hook = (
-	self: ServerReplica | ClientReplica,
+	self: Replica,
 	Path: ValidPath,
-	Callback: (...any) -> nil
+	Callback: (...any) -> nil,
+	SuppressOld: boolean?
 ) -> { Disconnect: () -> nil }
 
 export type Replica = {
 	Id: string,
 	Name: string,
-	Tags: { any },
-	OldData: { [string | number]: any }?,
+	Tags: { any }?,
+	__OldData: { [string | number]: any }?,
 
 	WriteLib: ModuleScript?,
 	__WriteLib: { [any]: any }?,
 
-	__Cleaner: typeof(Trove.new()),
-	__Write: typeof(Signal.new()),
-	__Change: typeof(Signal.new()),
-	__Fired: typeof(Signal.new()),
-	Destroying: typeof(Signal.new()),
+	__Fired: Signal,
+	__Write: Signal,
+	__Change: Signal,
+	__Cleaner: Cleaner,
+	Destroying: Signal,
 
-	Destroy: (self: Replica) -> nil,
 	ListenToWrite: Hook?,
 	ListenToChange: Hook?,
 	ListenToNewKey: Hook?,
+	AddCleanupMethod: (self: Replica, Method: any, CleanupMethod: any?) -> any,
 	ListenToKeyRemoved: Hook?,
 }
 
-export type ReplicaTable = typeof(setmetatable({}, {})) & {}
+export type ReplicaTable = typeof(setmetatable({}, {})) & {
+	Get: (self: ReplicaTable) -> any,
+	Insert: (self: ReplicaTable, Key: (string | number)?, Value: any) -> nil,
+	Remove: (self: ReplicaTable, Key: string | number) -> nil,
+}
+
+export type RemoteEvent = {
+	fire: (Player: Player, Packet: { [any]: any }) -> nil,
+	fireAll: (Packet: { [any]: any }) -> nil,
+	fireList: (Players: { Player }, Packet: { [any]: any }) -> nil,
+}
 
 export type ServerReplica = Replica & {
 	Data: ReplicaTable,
-	__Data: { [string | number]: any }?,
+	__Fire: (Event: RemoteEvent, Packet: { [any]: any }) -> nil,
 	__Ready: boolean?,
+	__Changes: { [any]: any },
 	__IsParent: boolean?,
+	__ReplicateToChanged: Signal,
 
 	To: ToOptions?,
 	Parent: ServerReplica?,
-	SetParent: (self: ServerReplica, Parent: ServerReplica?) -> nil,
+
 	Write: (self: ServerReplica, Method: string, ...any) -> ...any,
+	Destroy: (self: ServerReplica) -> nil,
+	SetValue: (self: ServerReplica, Path: ValidPath, Value: any) -> nil,
+	SetParent: (self: ServerReplica, Parent: ServerReplica?) -> nil,
+	DestroyFor: (self: ServerReplica, Player: Player) -> nil,
+	ReplicateFor: (self: ServerReplica, Player: Player) -> nil,
 }
 
 export type ClientReplica = Replica & {
 	Data: { [string | number]: any }?,
 	Parent: ClientReplica?,
+	Destroy: (self: ClientReplica) -> nil,
+}
+
+type packetKey = {
+	Key: string,
+	IsNumber: boolean,
+}
+
+type changePacket = packetKey & {
+	Value: unknown?,
+	Action: string?,
 }
 
 export type Packet = {
 	Id: string,
 	Changes: {
-		[number]: { Time: number, Path: { string | number }, Value: any },
+		[number]: changePacket,
 	},
 }
 
@@ -62,8 +95,17 @@ export type Config = {
 	Tags: { any }?,
 	Data: { [string | number]: any }?,
 	WriteLib: ModuleScript?,
-	Parent: (ServerReplica | ClientReplica)?,
-	To: ToOptions?,
+	IsParent: boolean?,
+}
+
+export type ServerConfig = Config & {
+	To: ToOptions,
+	Parent: ServerReplica?,
+}
+
+export type ClientConfig = Config & {
+	Id: string,
+	Parent: string?,
 }
 
 export type ServerReplicator = {
@@ -71,7 +113,7 @@ export type ServerReplicator = {
 }
 
 export type ClientReplicator = {
-	ListenToNewReplica: (Callback: (Replica: ClientReplica) -> nil) -> { Disconnect: () -> nil },
+	ListenToNewReplica: (Name: string, Callback: (Replica: ClientReplica) -> nil) -> { Disconnect: () -> nil },
 }
 
 return {}

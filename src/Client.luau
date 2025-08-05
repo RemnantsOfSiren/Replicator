@@ -1,15 +1,11 @@
 --!strict
 local Sift = require(script.Parent.Parent.Sift) :: any
-local Trove = require(script.Parent.Parent.Trove) :: any
-local Signal = require(script.Parent.Parent.Signal) :: any
 
+local Logger = require(script.Parent.Logger)
 local Net = require(script.Parent.Net.Client)
 local Types = require(script.Parent.Types)
-local Logger = require(script.Parent.Logger)
+local Serializer = require(script.Parent.Serializer)
 
-local SharedFunctions = require(script.Parent.SharedFunctions)
-
-local Array = Sift.Array
 local Dictionary = Sift.Dictionary
 local CopyDeep = Dictionary.copyDeep
 
@@ -17,33 +13,22 @@ local Replicas = {}
 local Replicators = {}
 
 local function FindReplicaById(Id: string?): Types.ClientReplica?
-	if Id then
-		for _, _Replicator in pairs(Replicators) do
-			if not _Replicator.IsParent then
-				continue
-			end
-
-			local _Replica = _Replicator.__Replicas[Id]
-
-			if _Replica then
-				return _Replica
-			end
-		end
-	end
-
-	return nil
+	return Replicas[Id]
 end
 
-local Replica = {}
-Replica.__index = Replica
+local Replica = require(script.Parent.Replica)
 
-function Replica:GetChildren()
+local ClientReplica = {}
+ClientReplica.__index = ClientReplica
+setmetatable(ClientReplica, { __index = Replica })
+
+function ClientReplica:GetChildren()
 	if self.__IsParent then
 		return Dictionary.filter(Replicas, function(_, _Replica)
 			return _Replica.__Parent == self
 		end)
 	else
-		warn("Replica is not a parent.")
+		Logger("Warn", "Replica is not a parent.")
 		return {}
 	end
 end
@@ -57,37 +42,32 @@ end
 
 	Listens for a client event, and fires the callback with the arguments passed.
 ]=]
-function Replica:OnClientEvent(Callback: (...any) -> nil): { Disconnect: () -> nil }
+function ClientReplica:OnClientEvent(Callback: (...any) -> nil): { Disconnect: () -> nil }
 	return self.__Fired:Connect(Callback)
 end
 
-function Replica:Fire(...)
+function ClientReplica:Fire(...)
 	local Args = { ... }
 
 	Net.fireServerEvent.fire({
-		Name = self.Name,
 		Id = self.Id,
 		Args = Args,
 	})
 end
 
-function Replica:Destroy()
+function ClientReplica:Destroy()
 	Replicas[self.Id] = nil
 	self.Destroying:Fire()
 	task.defer(self.__Cleaner.Destroy, self.__Cleaner)
 	table.clear(self)
 end
 
-local function NewReplica(Config: {
-	Name: string,
-	Id: string,
-	Tags: { any },
-	Data: any,
-	WriteLib: ModuleScript?,
-	Parent: string?,
-	IsParent: boolean?,
-}): Types.ClientReplica
-	local Cleaner = Trove.new()
+export type ClientReplica = Replica.Replica & typeof(setmetatable({} :: Types.ClientReplica, ClientReplica))
+
+local function NewReplica(Config: Types.ClientConfig): ClientReplica
+	if Config.WriteLib and not Config.WriteLib:IsA("ModuleScript") then
+		return Logger("Warn", "WriteLib must be a ModuleScript.")
+	end
 
 	local Parent
 
@@ -98,32 +78,7 @@ local function NewReplica(Config: {
 		until Parent
 	end
 
-	local self = setmetatable({
-		Id = Config.Id,
-		Name = Config.Name,
-		Tags = Config.Tags,
-		Data = Config.Data,
-		__IsParent = Config.IsParent,
-
-		__Write = Cleaner:Construct(Signal),
-		__Fired = Cleaner:Construct(Signal),
-		__Change = Cleaner:Construct(Signal),
-		Destroying = Cleaner:Construct(Signal),
-
-		__Cleaner = Cleaner,
-
-		__Parent = Parent,
-		WriteLib = Config.WriteLib,
-		__WriteLib = Config.WriteLib and require(Config.WriteLib) :: { [any]: any } or nil,
-	}, Replica)
-
-	for Key, Function in SharedFunctions do
-		self[Key] = Function
-	end
-
-	self.__Cleaner:Connect(self.Destroying, function()
-		self.__Cleaner:Destroy()
-	end)
+	local self = setmetatable(Replica.new(Config), ClientReplica) :: ClientReplica
 
 	Replicas[Config.Id] = self
 
@@ -137,7 +92,7 @@ function Replicator:AddListener(Callback)
 	table.insert(self.__Listeners, Callback)
 
 	for _, _Replica in pairs(self.__Replicas) do
-		task.spawn(Callback, _Replica)
+		task.spawn(Callback, FindReplicaById(_Replica))
 	end
 
 	return function()
@@ -151,20 +106,21 @@ function Replicator:AddListener(Callback)
 end
 
 function Replicator:AddReplica(_Replica)
-	if self.__Replicas[_Replica.Id] then
+	if table.find(self.__Replicas, _Replica.Id) then
 		return
 	elseif _Replica.Name ~= self.Name then
 		Logger("Warn", "Replica name does not match replicator name.")
 		return
 	end
 
-	self.__Replicas[_Replica.Id] = _Replica
+	table.insert(self.__Replicas, _Replica.Id)
+
 	for _, Listener in self.__Listeners do
 		task.spawn(Listener, _Replica)
 	end
 end
 
-local function NewReplicator(Name: string, IsParent: boolean)
+local function NewReplicator(Name: string, IsParent: boolean?)
 	if Replicators[Name] then
 		return Replicators[Name]
 	end
@@ -185,80 +141,24 @@ Net.createReplica.on(function(_Replica)
 	local _Replicator = NewReplicator(_Replica.Name, _Replica.IsParent)
 
 	if not Replicas[_Replica.Id] then
-		task.spawn(_Replicator.AddReplica, _Replicator, NewReplica(_Replica))
+		task.spawn(_Replicator.AddReplica, _Replicator, NewReplica(_Replica :: any))
 	else
 		Logger("Warn", "Replica already exists")
 	end
 end)
 
 Net.destroyReplica.on(function(Id)
-	local _Replica = Replicas[Id]
+	local _Replica = FindReplicaById(Id)
 
 	if _Replica then
 		local Name = _Replica.Name
 		local _Replicator = Replicators[Name]
+
 		if _Replicator then
-			_Replicator.__Replicas[Id] = nil
+			table.remove(_Replicator.__Replicas, table.find(_Replicator.__Replicas, Id))
 		end
+
 		_Replica:Destroy()
-	end
-end)
-
-Net.updateReplica.on(function(Data: Types.Packet)
-	local _Replica = Replicas[Data.Id]
-
-	if _Replica then
-		if _Replica.__IsParent then
-			Logger("Warn", "Parent replicas cannot be altered.")
-			return
-		end
-
-		table.sort(Data.Changes, function(A, B)
-			return A.Time < B.Time
-		end)
-
-		for _, Change in Data.Changes do
-			local Path = Change.Path
-			local _Data = _Replica.Data
-
-			for I = 1, #Path - 1 do
-				local Key = Path[I]
-				_Data = _Data[Key]
-
-				if type(_Data) ~= "table" then
-					Logger("Warn", `Replica ({_Replica.Id}) attempting to index a non table value at key {Key}.`)
-				end
-
-				if not _Data then
-					return
-				end
-			end
-
-			if _Data then
-				local _OldData = CopyDeep(_Replica.Data)
-				local LastKey = Path[#Path]
-
-				if
-					LastKey ~= nil
-					and type(LastKey) == "number"
-					and (Array.is(_Data) or Dictionary.count(_Data) == 0)
-				then
-					if Change.Value == nil then
-						table.remove(_Data, LastKey :: number)
-					elseif _Data[LastKey] then
-						_Data[LastKey] = Change.Value
-					else
-						table.insert(_Data, LastKey :: number, Change.Value)
-					end
-				else
-					pcall(function()
-						_Data[LastKey] = Change.Value
-					end)
-				end
-
-				_Replica.__Change:Fire(Path, _Data[LastKey], _OldData)
-			end
-		end
 	end
 end)
 
@@ -266,7 +166,8 @@ Net.fireClientEvent.on(function(Data)
 	local _Replica = Replicas[Data.Id]
 
 	if _Replica then
-		_Replica.__Fired:Fire(table.unpack(Data.Args))
+		local Args = Data.Args or {}
+		_Replica.__Fired:Fire(table.unpack(Args))
 	end
 end)
 
@@ -275,14 +176,57 @@ Net.changeParent.on(function(Info)
 
 	if _Replica then
 		local _Parent = FindReplicaById(Info.Parent)
-		_Replica.__Parent = _Parent
+		_Replica.Parent = _Parent
+	end
+end)
+
+local function BatchUpdateReplica(Id, Changes)
+	local _Replica = Replicas[Id]
+
+	if not _Replica then
+		return
+	end
+
+	local Data = _Replica.Data
+
+	if not Data then
+		return
+	end
+
+	local OldData = CopyDeep(Data)
+
+	for _, Packet in Changes do
+		local _Path = Serializer.ConvertToPath(Packet.Path)
+
+		local _Data = Data
+
+		for I = 1, #_Path - 1 do
+			local Key = _Path[I]
+			_Data = _Data[Key]
+		end
+
+		if Packet.Action == "Set" then
+			_Data[_Path[#_Path]] = Packet.Value
+		elseif Packet.Action == "Remove" then
+			table.remove(_Data, _Path[#_Path])
+		elseif Packet.Action == "Insert" then
+			table.insert(_Data, Packet.Value)
+		end
+
+		_Replica.__Change:Fire(_Path, Data, OldData)
+	end
+end
+
+Net.updateReplicas.on(function(Data)
+	for Id, Change in Data do
+		task.spawn(BatchUpdateReplica, Id, Change)
 	end
 end)
 
 task.defer(function()
 	local _Replicas = Net.getInitialReplicas.invoke()
 
-	table.sort(_Replicas, function(A, B)
+	table.sort(_Replicas, function(A: { [any]: any }, B: { [any]: any })
 		return A.IsParent and not B.IsParent
 	end)
 
@@ -294,7 +238,7 @@ task.defer(function()
 		end
 
 		if not Replicas[_Replica.Id] then
-			task.spawn(_Replicator.AddReplica, _Replicator, NewReplica(_Replica))
+			task.spawn(_Replicator.AddReplica, _Replicator, NewReplica(_Replica :: any))
 		end
 	end
 end)
@@ -330,7 +274,7 @@ return table.freeze({
 				until _Replicator
 			end
 
-			Listener = _Replicator:AddListener(Callback)
+			Listener = (_Replicator :: any):AddListener(Callback)
 		end)
 
 		return Disconnector

@@ -5,6 +5,22 @@ option RemoteScope = "REPLICATOR"
 
 map unknownArray = { [u8]: unknown }
 
+struct key {
+    Key: string,
+    IsNumber: boolean
+}
+
+map keyArray = { [u8]: key }
+
+struct packet {
+    Path: keyArray,
+    Value: unknown?,
+    Action: string?,
+    IsNumber: boolean,
+}
+
+map arrayOfChanges = { [u8]: packet }
+
 struct replica {
     Id: string,
     Name: string,
@@ -15,13 +31,6 @@ struct replica {
     IsParent: boolean?
 }
 
-struct replicaChange {
-    Time: f64,
-    Path: unknownArray,
-    Value: unknown?,
-}
-
-map arrayOfChanges = { [u8]: replicaChange }
 
 event createReplica {
     From: Server,
@@ -30,14 +39,11 @@ event createReplica {
     Data: replica,
 }
 
-event updateReplica {
+event updateReplicas {
     From: Server,
     Type: Reliable,
     Call: SingleSync,
-    Data: struct {
-        Id: string,
-        Changes: arrayOfChanges,
-    }
+    Data: map { [string]: arrayOfChanges } 
 }
 
 event fireServerEvent {
@@ -46,7 +52,7 @@ event fireServerEvent {
     Call: SingleSync,
     Data: struct {
         Id: string,
-        Args: unknownArray,
+        Args: unknownArray?,
     }
 }
 
@@ -56,7 +62,7 @@ event fireClientEvent {
     Call: SingleSync,
     Data: struct {
         Id: string,
-        Args: unknownArray,
+        Args: unknownArray?,
     }
 }
 
@@ -83,12 +89,12 @@ event replicaWrite {
     Call: SingleSync,
     Data: struct {
         Id: string,
-        Method: string,
         Args: unknownArray?,
+        Method: string,
     }
 }
 
 function getInitialReplicas {
     Yield: Coroutine,
-    Return: replica[0..255]
+    Return: replica[0..512]
 }
