@@ -94,7 +94,7 @@ local function Insert(self: ReplicatedTable, ...: any)
 		rawset(self.__value, Index, NewReplicatedTable)
 	end
 	self.__updated = true
-	self.__signal:Fire(self)
+	self.__signal:Fire(Path)
 end
 
 local function Remove(self: ReplicatedTable, Index: number)
@@ -116,7 +116,7 @@ local function Remove(self: ReplicatedTable, Index: number)
 		rawset(self.__value, Index, nil)
 	end
 	self.__updated = true
-	self.__signal:Fire(self)
+	self.__signal:Fire(Path)
 end
 
 local function GetChildren(self: ReplicatedTable): { ReplicatedTable }
@@ -221,7 +221,7 @@ CreateReplicatedTable = function(
 			_Indicies[#_Indicies + 1] = Key
 
 			if self.__updated then
-				self.__signal:Fire(_Indicies, Table, self.__oldtable)
+				self.__signal:Fire(_Indicies)
 			end
 
 			if IsTable then

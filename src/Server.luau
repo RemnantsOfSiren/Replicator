@@ -1,11 +1,13 @@
 --!strict
+local Players = game:GetService("Players")
+
 local Sift = require(script.Parent.Parent.Sift) :: any
 local Signal = require(script.Parent.Parent.Signal) :: any
 
-local Logger = require(script.Parent.Logger)
 local Net = require(script.Parent.Net.Server)
-local Parser = require(script.Parent.Parser)
 local Types = require(script.Parent.Types)
+local Logger = require(script.Parent.Logger)
+local Parser = require(script.Parent.Parser)
 
 local Dictionary = Sift.Dictionary
 
@@ -441,7 +443,15 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 	return self
 end
 
+local AlreadyInitialized = {}
+
 Net.getInitialReplicas.on(function(Player: Player)
+	if AlreadyInitialized[Player.Name] then
+		return {}
+	end
+	
+	AlreadyInitialized[Player.Name] = true
+
 	return Dictionary.values(Dictionary.map(
 		Dictionary.filter(Replicas, function(_Replica)
 			return _Replica.To == "All"
@@ -491,6 +501,13 @@ task.spawn(function()
 		end
 
 		task.wait()
+	end
+end)
+
+Players.PlayerRemoving:Connect(function(Player) 
+	local Name = Player.Name
+	if AlreadyInitialized[Name] then
+		AlreadyInitialized[Name] = nil
 	end
 end)
 
