@@ -602,7 +602,6 @@ Reliable.OnServerEvent:Connect(function(Player: Player, Buffer: buffer, Instance
 		end
 	end
 end)
-
 Unreliable.OnServerEvent:Connect(function(Player: Player, Buffer: buffer, Instances: { Instance })
 	RecieveCursor = 0
 	RecieveBuffer = Buffer
