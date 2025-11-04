@@ -15,8 +15,8 @@ local function ConvertToPacket(Info)
 		end
 
 		table.insert(Packet, {
-			IsNumber = type(Key) == "number",
 			Key = tostring(Key),
+			IsNumber = type(Key) == "number",
 		})
 	end
 
