@@ -14,9 +14,9 @@ map keyArray = { [u8]: key }
 
 struct packet {
     Path: keyArray,
+    Order: u16,
     Value: unknown?,
     Action: string?,
-    IsNumber: boolean,
 }
 
 map arrayOfChanges = { [u8]: packet }

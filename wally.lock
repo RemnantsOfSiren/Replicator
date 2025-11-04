@@ -8,14 +8,14 @@ version = "0.0.11"
 dependencies = []
 
 [[package]]
-name = "lucasmzreal/fastsignal"
-version = "10.3.2"
+name = "data-oriented-house/lemonsignal"
+version = "1.11.0"
 dependencies = []
 
 [[package]]
 name = "remnantsofsiren/replicator2"
-version = "1.4.6-experimental"
-dependencies = [["Sift", "csqrl/sift@0.0.11"], ["Signal", "lucasmzreal/fastsignal@10.3.2"], ["Trove", "sleitnick/trove@1.4.0"]]
+version = "1.6.8-experimental"
+dependencies = [["Sift", "csqrl/sift@0.0.11"], ["Signal", "data-oriented-house/lemonsignal@1.11.0"], ["Trove", "sleitnick/trove@1.4.0"]]
 
 [[package]]
 name = "sleitnick/trove"

@@ -112,9 +112,10 @@ local function Remove(self: ReplicatedTable, Index: number)
 		Action = "Remove",
 	})
 
-	if _Value and type(_Value) == "table" then
+	if rawget(self.__value, Index) and _Value and type(_Value) == "table" then
 		rawset(self.__value, Index, nil)
 	end
+
 	self.__updated = true
 	self.__signal:Fire(Path)
 end
@@ -142,12 +143,24 @@ local function Destroy(self: ReplicatedTable)
 	table.clear(self)
 end
 
-local function RecursivelyGetChanges(self: ReplicatedTable)
+local function RecursivelyGetChanges(self: ReplicatedTable, Order: number?)
+	if not Order then
+		Order = 0
+	end
+
 	local Changes = CopyDeep(self.__changes)
 
+	for _, Change in Changes do
+		Change.Order = Order
+		Order += 1
+	end
+
 	for _, Value in self:GetChildren() do
-		local ChildChanges = RecursivelyGetChanges(Value)
+		local ChildChanges = RecursivelyGetChanges(Value, Order)
+
 		for _, Change in ChildChanges do
+			Change.Order = Order
+			Order += 1
 			table.insert(Changes, Change)
 		end
 	end
@@ -209,11 +222,36 @@ CreateReplicatedTable = function(
 					local Path = table.clone(self.__indicies or {})
 					Path[#Path + 1] = Key
 
-					table.insert(self.__changes, {
-						Path = Serializer.ConvertToPacket(Path),
-						Value = Value,
-						Action = "Set",
-					})
+					local SerializedPath = Serializer.ConvertToPacket(Path)
+
+					local FoundChange = false
+
+					for _, change in self.__changes do
+						if #change.Path == #SerializedPath then
+							local Valid = true
+			
+							for i = 1, #SerializedPath do
+								if change.Path[i].Key ~= SerializedPath[i].Key then
+									Valid = false
+									break
+								end
+							end
+							
+							if Valid then
+								change.Value = Value
+								FoundChange = true
+								break
+							end
+						end
+					end
+
+					if not FoundChange then
+						table.insert(self.__changes, {
+							Path = Serializer.ConvertToPacket(Path),
+							Value = Value,
+							Action = "Set",
+						})
+					end
 				end
 			end
 
@@ -222,6 +260,10 @@ CreateReplicatedTable = function(
 
 			if self.__updated then
 				self.__signal:Fire(_Indicies)
+			end
+
+			if rawget(self.__value, Key) and Value == nil then
+				rawset(self.__value, Key, nil)
 			end
 
 			if IsTable then

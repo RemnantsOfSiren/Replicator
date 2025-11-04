@@ -195,6 +195,10 @@ local function BatchUpdateReplica(Id, Changes)
 
 	local OldData = CopyDeep(Data)
 
+	table.sort(Changes, function(A, B)
+		return A.Order < B.Order
+	end)
+
 	for _, Packet in Changes do
 		local _Path = Serializer.ConvertToPath(Packet.Path)
 

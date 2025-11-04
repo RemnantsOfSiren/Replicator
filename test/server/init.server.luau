@@ -36,12 +36,13 @@ for _, Replica in ipairs(Replicas) do
         Replica.Data.TestArray:Remove(3)
     end)
 
-    -- Replica:AddCleanupMethod(task.spawn(function()
-    --     while true do
-    --         Replica.Data.TestString = `Test String {math.random(1, 1000)}`
-    --         task.wait()
-    --     end
-    -- end), true)
+    Replica:AddCleanupMethod(task.spawn(function()
+        while true do
+            Replica.Data.TestArray:Insert({ 10 })
+            task.wait()
+            Replica.Data.TestArray:Remove(1)
+        end
+    end), true)
 end
 
 -- task.delay(16, function() 

@@ -207,21 +207,23 @@ end
     This should only ever be intentionally called from the Server.
 ]=]
 function ServerReplica:Destroy()
-	self.Destroying:Fire()
+	if self.Destroying then
+		self.Destroying:Fire()
 
-	Replicas[self.Id] = nil
+		Replicas[self.Id] = nil
 
-	Net.destroyReplica.fireAll(self.Id)
+		Net.destroyReplica.fireAll(self.Id)
 
-	if self.__IsParent then
-		for _, ChildReplica in self:GetChildren() do
-			ChildReplica.To = self.To
-			Net.destroyReplica.fireAll(ChildReplica.Id)
+		if self.__IsParent then
+			for _, ChildReplica in self:GetChildren() do
+				ChildReplica.To = self.To
+				Net.destroyReplica.fireAll(ChildReplica.Id)
+			end
 		end
-	end
 
-	task.defer(self.__Cleaner.Destroy, self.__Cleaner)
-	table.clear(self)
+		task.defer(self.__Cleaner.Destroy, self.__Cleaner)
+		table.clear(self)
+	end
 end
 
 --[=[
