@@ -1,0 +1,91 @@
+option Casing = Camel
+option ClientOutput = "src/Net/Client"
+option ServerOutput = "src/Net/Server"
+option RemoteScope = "REPLICATOR"
+
+struct Replica {
+    Id: string,
+    Name: string,
+    Tags: string[]?,
+    Data: unknown?,
+    Parent: string?,
+    IsParent: boolean?,
+    WriteLib: Instance?,
+}
+
+event createReplica {
+    From: Server,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: Replica,
+}
+
+event fireServerEvent {
+    From: Client,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: struct {
+        Id: string,
+        Args: unknown[]?,
+    }
+}
+
+event updateReplica {
+    From: Server,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: struct {
+        Id: string,
+        Change: struct {
+            Path: struct {
+                Key: string,
+                IsNumber: boolean,
+            }[],
+            Value: unknown?,
+            Action: string,
+        },
+    }
+}
+
+event fireClientEvent {
+    From: Server,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: struct {
+        Id: string,
+        Args: unknown[]?,
+    }
+}
+
+event changeParent {
+    From: Server,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: struct {
+        Id: string,
+        Parent: string?,
+    }
+}
+
+event destroyReplica {
+    From: Server,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: string,
+}
+
+event replicaWrite {
+    From: Server,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: struct {
+        Id: string,
+        Args: unknown[]?,
+        Method: string,
+    }
+}
+
+function getInitialReplicas {
+    Yield: Coroutine,
+    Return: Replica[]
+}

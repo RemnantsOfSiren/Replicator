@@ -1,0 +1,20 @@
+[package]
+name = "data-oriented-house/lemonsignal"
+description = "A pure Luau signal implementation faster than most other implementations in Roblox."
+version = "1.11.0"
+licence = "MIT"
+authors = ["Aspecky", "Sona"]
+realm = "shared"
+registry = "https://github.com/UpliftGames/wally-index"
+homepage = "https://data-oriented-house.github.io/LemonSignal/"
+repository = "https://github.com/Data-Oriented-House/LemonSignal"
+exclude = ["**"]
+include = [
+    "default.project.json",
+    "src",
+    "src/**",
+    "LICENSE",
+    "wally.toml",
+]
+
+[dependencies]
