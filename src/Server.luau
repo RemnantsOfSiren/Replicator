@@ -3,6 +3,9 @@ local Players = game:GetService("Players")
 
 local Sift = require(script.Parent.Parent.Sift) :: any
 local Signal = require(script.Parent.Parent.Signal) :: any
+local VoidSentry = require(script.Parent.Parent.VoidSentry) :: any
+
+local Dynamic = VoidSentry.Dynamic
 
 local Net = require(script.Parent.Net.Server)
 local Types = require(script.Parent.Types)
@@ -21,11 +24,17 @@ ServerReplica.__index = ServerReplica
 setmetatable(ServerReplica, { __index = Replica })
 
 local function CreateReplica(player, replica)
+	local Buffer = nil
+
+	if replica.Data then
+		Buffer = Dynamic.serialize(nil, nil, replica.Data:Get())
+	end
+
 	Net.createReplica.fire(player, {
 		Id = replica.Id,
 		Name = replica.Name,
 		Tags = replica.Tags,
-		Data = if replica.Data then replica.Data:Get() else nil,
+		Data = Buffer,
 		Parent = if replica.__Parent then replica.__Parent.Id else nil,
 		IsParent = replica.__IsParent,
 		WriteLib = replica.WriteLib,
@@ -45,7 +54,10 @@ end
 function ServerReplica:Write(Method: string, ...: any)
 	if self.__WriteLib and self.__WriteLib[Method] then
 		local Return = { self.__WriteLib[Method](self, ...) }
-		local Packet = { Method = Method, Args = { ... } }
+
+		local Buffer = Dynamic.serialize(nil, nil, { ... })
+		local Packet = { Method = Method, Args = Buffer }
+
 		self.__Fire(Net.replicaWrite, Packet)
 		return unpack(Return)
 	end
@@ -121,7 +133,8 @@ end
 ]=]
 function ServerReplica:Fire(...)
 	local Args = { ... }
-	self.__Fire(Net.fireClientEvent, { Args = Args })
+	local Buffer = Dynamic.serialize(nil, nil, Args)
+	self.__Fire(Net.fireClientEvent, { Args = Buffer })
 end
 
 --[=[
@@ -414,10 +427,12 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 		self.Data = self:AddCleanupMethod(CreateReplicatedTable(Config.Data, nil, function(Packet, Value, Action)
 			self.__Change:Fire(Serializer.ConvertToPath(Packet), self.Data:Get(), self.Data.__oldtable)
 
+			local Buffer = Dynamic.serialize(nil, nil, Value)
+
 			self.__Fire(Net.updateReplica, {
 				Change = {
 					Path = Packet,
-					Value = Value,
+					Value = Buffer,
 					Action = Action,
 				},
 			})
@@ -438,7 +453,7 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 	self.__Fire(Net.createReplica, {
 		Name = self.Name,
 		Tags = self.Tags,
-		Data = self.Data and self.Data:Get(),
+		Data = self.Data and Dynamic.serialize(nil, nil, self.Data:Get()),
 		Parent = Config.Parent and Config.Parent.Id,
 		WriteLib = self.WriteLib,
 	})
@@ -469,7 +484,7 @@ Net.getInitialReplicas.on(function(Player: Player)
 				Id = _Replica.Id,
 				Name = _Replica.Name,
 				Tags = _Replica.Tags,
-				Data = if _Replica.Data then _Replica.Data:Get() else nil,
+				Data = if _Replica.Data then Dynamic.serialize(nil, nil, _Replica.Data:Get()) else nil,
 				Parent = if _Replica.__Parent then _Replica.__Parent.Id else nil,
 				IsParent = _Replica.__IsParent,
 				WriteLib = _Replica.WriteLib,

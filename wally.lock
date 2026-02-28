@@ -13,9 +13,14 @@ version = "1.11.0"
 dependencies = []
 
 [[package]]
-name = "remnantsofsiren/replica-rewrite"
-version = "0.1.0"
-dependencies = [["Sift", "csqrl/sift@0.0.11"], ["Signal", "data-oriented-house/lemonsignal@1.11.0"], ["Trove", "sleitnick/trove@1.8.0"]]
+name = "elentium/voidsentry"
+version = "0.0.7"
+dependencies = []
+
+[[package]]
+name = "remnantsofsiren/replicator2"
+version = "2.0.2-experimental"
+dependencies = [["Sift", "csqrl/sift@0.0.11"], ["Signal", "data-oriented-house/lemonsignal@1.11.0"], ["Trove", "sleitnick/trove@1.8.0"], ["VoidSentry", "elentium/voidsentry@0.0.7"]]
 
 [[package]]
 name = "sleitnick/trove"

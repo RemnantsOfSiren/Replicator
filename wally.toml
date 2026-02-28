@@ -1,6 +1,6 @@
 [package]
 name = "remnantsofsiren/replicator2"
-version = "2.0.1-experimental"
+version = "2.0.2-experimental"
 registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
 exclude = ["test", "Packages", "build", "test.project.json", "selene.toml", "README.md", ".gitignore", ".vscode", ".github", "NetDefinitions.blink", "oldsrc"]
@@ -13,3 +13,4 @@ shared-packages = "game.ReplicatedStorage.Packages"
 Sift = "csqrl/sift@^0"
 Trove = "sleitnick/trove@^1"
 Signal = "data-oriented-house/lemonsignal@^1"
+VoidSentry = "elentium/voidsentry@0.0.7"

@@ -50,7 +50,7 @@ local function Insert(self: ReplicatedTable, ...: any)
 	Path[#Path + 1] = Index
 
 	if _Value and type(_Value) == "table" then
-		local NewReplicatedTable = CreateReplicatedTable(_Value, InsertIndices, self)
+		local NewReplicatedTable = CreateReplicatedTable(_Value, InsertIndices, self.__onChange)
 		rawset(self.__value, Index, NewReplicatedTable)
 	end
 	

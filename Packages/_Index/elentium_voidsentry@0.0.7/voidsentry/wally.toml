@@ -1,0 +1,9 @@
+[package]
+name = "elentium/voidsentry"
+version = "0.0.7"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+authors = ["IAMNOTULTRA3"]
+description = "low-level buffer serializer with high performance & flexibility"
+exclude = ["roblox-direct", "docs"]
+license = "Apache-2.0"

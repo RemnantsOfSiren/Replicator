@@ -1,5 +1,8 @@
 --!strict
 local Sift = require(script.Parent.Parent.Sift) :: any
+local VoidSentry = require(script.Parent.Parent.VoidSentry) :: any
+
+local Dynamic = VoidSentry.Dynamic
 
 local Logger = require(script.Parent.Logger)
 local Net = require(script.Parent.Net.Client)
@@ -51,7 +54,7 @@ function ClientReplica:Fire(...)
 
 	Net.fireServerEvent.fire({
 		Id = self.Id,
-		Args = Args,
+		Args = Dynamic.serialize(nil, nil, Args),
 	})
 end
 
@@ -138,6 +141,12 @@ local function NewReplicator(Name: string, IsParent: boolean?)
 end
 
 Net.createReplica.on(function(_Replica)
+	local Data = Dynamic.deserialize(nil, nil, _Replica.Data)
+
+	if Data then
+		_Replica.Data = Data
+	end
+
 	local _Replicator = NewReplicator(_Replica.Name, _Replica.IsParent)
 
 	if not Replicas[_Replica.Id] then
@@ -167,7 +176,18 @@ Net.fireClientEvent.on(function(Data)
 
 	if _Replica then
 		local Args = Data.Args or {}
-		_Replica.__Fired:Fire(table.unpack(Args))
+		local Buffer = Dynamic.deserialize(nil, nil, Args)
+		_Replica.__Fired:Fire(unpack(Buffer))
+	end
+end)
+
+Net.replicaWrite.on(function(Data)
+	local _Replica = Replicas[Data.Id]
+
+	if _Replica then
+		local Args = Data.Args or {}
+		local Buffer = Dynamic.deserialize(nil, nil, Args)
+		_Replica.__Write:Fire(Data.Method, unpack(Buffer))
 	end
 end)
 
@@ -206,12 +226,14 @@ Net.updateReplica.on(function(Packet: {Id: string, Change: Types.ChangePacket})
 		_Data = _Data[Key]
 	end
 
+	local Value = if _Packet.Value then Dynamic.deserialize(nil, nil, _Packet.Value) else nil
+
 	if _Packet.Action == "Set" then
-		_Data[_Path[#_Path]] = _Packet.Value
+		_Data[_Path[#_Path]] = Value
 	elseif _Packet.Action == "Remove" then
 		table.remove(_Data, _Path[#_Path])
 	elseif _Packet.Action == "Insert" then
-		table.insert(_Data, _Packet.Value)
+		table.insert(_Data, Value)
 	end
 
 	_Replica.__Change:Fire(_Path, Data, OldData)
@@ -232,6 +254,10 @@ task.defer(function()
 		end
 
 		if not Replicas[_Replica.Id] then
+			if _Replica.Data then
+				_Replica.Data = Dynamic.deserialize(nil, nil, _Replica.Data)
+			end
+
 			task.spawn(_Replicator.AddReplica, _Replicator, NewReplica(_Replica :: any))
 		end
 	end

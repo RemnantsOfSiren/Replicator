@@ -38,7 +38,7 @@ export type Replica = {
 	ListenToKeyRemoved: Hook?,
 }
 
-export type ReplicaTable = typeof(setmetatable({}, {})) & {
+export type ReplicaTable = {
 	Get: (self: ReplicaTable) -> any,
 	Insert: (self: ReplicaTable, Key: (string | number)?, Value: any) -> nil,
 	Remove: (self: ReplicaTable, Key: string | number) -> nil,
@@ -109,11 +109,11 @@ export type ClientConfig = Config & {
 }
 
 export type ServerReplicator = {
-	NewReplica: (Config: Config) -> ServerReplica,
+	NewReplica: (Config: Config) -> ServerReplica?,
 }
 
 export type ClientReplicator = {
-	ListenToNewReplica: (Name: string, Callback: (Replica: ClientReplica) -> nil) -> { Disconnect: () -> nil },
+	ListenToNewReplica: (Name: string, Callback: (Replica: ClientReplica) -> nil) -> { Disconnect: () -> nil }?,
 }
 
 return {}
