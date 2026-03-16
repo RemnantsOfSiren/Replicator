@@ -1,8 +1,7 @@
 local HttpService = game:GetService("HttpService")
 
-local Logger = require(script.Parent.Logger)
 local Sift = require(script.Parent.Parent.Sift)
-local Signal = require(script.Parent.Parent.Signal)
+local Logger = require(script.Parent.Logger)
 
 local Serializer = require(script.Parent.Serializer)
 
@@ -113,7 +112,7 @@ CreateReplicatedTable = function(
 			local IsTable = type(Value) == "table"
 			self.__oldtable = self:Get()
 
-			if IsTable and Value.__type == "Replicated Table" then
+			if IsTable and Value.__type == "ReplicatedTable" then
 				return
 			end
 			
@@ -178,7 +177,7 @@ CreateReplicatedTable = function(
 							function(NewValue)
 								local IsReplicatedTable = type(NewValue) == "table"
 									and NewValue.__type
-									and NewValue.__type == "Replicated Table"
+									and NewValue.__type == "ReplicatedTable"
 
 								if IsReplicatedTable then
 									rawset(Table, Index, NewValue:Get())
@@ -204,7 +203,7 @@ CreateReplicatedTable = function(
 
 	for Index, Value in Table do
 		if type(Value) == "table" then
-			if Value.__type and Value.__type == "Replicated Table" then
+			if Value.__type and Value.__type == "ReplicatedTable" then
 				rawset(ReplicatedTable, Index, Value)
 			else
 				ReplicatedTable[Index] = Value
