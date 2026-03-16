@@ -175,9 +175,9 @@ Net.fireClientEvent.on(function(Data)
 	local _Replica = Replicas[Data.Id]
 
 	if _Replica then
-		local Args = Data.Args or {}
-		local Buffer = Dynamic.deserialize(nil, nil, Args)
-		_Replica.__Fired:Fire(unpack(Buffer))
+		local Buffer = Data.Args or {}
+		local Args = Dynamic.deserialize(nil, nil, Buffer)
+		_Replica.__Fired:Fire(unpack(Args))
 	end
 end)
 
@@ -185,9 +185,9 @@ Net.replicaWrite.on(function(Data)
 	local _Replica = Replicas[Data.Id]
 
 	if _Replica then
-		local Args = Data.Args or {}
-		local Buffer = Dynamic.deserialize(nil, nil, Args)
-		_Replica.__Write:Fire(Data.Method, unpack(Buffer))
+		local Buffer = Data.Args or {}
+		local Args = Dynamic.deserialize(nil, nil, Buffer)
+		_Replica.__Write:Fire(Data.Method, unpack(Args))
 	end
 end)
 

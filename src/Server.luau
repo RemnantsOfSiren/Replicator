@@ -497,7 +497,9 @@ Net.fireServerEvent.on(function(Player, Packet)
 	local _Replica = Replicas[Packet.Id]
 
 	if _Replica then
-		_Replica.__Fired:Fire(Player, unpack(Packet.Args or {}))
+		local Buffer = Packet.Args or {}
+		local Args = Dynamic.deserialize(nil, nil, Buffer)
+		_Replica.__Fired:Fire(Player, unpack(Args))
 	end
 end)
 
