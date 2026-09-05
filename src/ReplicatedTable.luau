@@ -1,43 +1,26 @@
+--!strict
 local HttpService = game:GetService("HttpService")
 
-local Sift = require(script.Parent.Parent.Sift)
-local Logger = require(script.Parent.Logger)
+local Sift = require(script.Parent.Parent.Sift) :: any
 
+local Types = require(script.Parent.Types)
+local Logger = require(script.Parent.Logger)
 local Serializer = require(script.Parent.Serializer)
 
 local Dictionary = Sift.Dictionary
 local CopyDeep = Dictionary.copyDeep
 
-export type ReplicatedTable = typeof(setmetatable(
-	{} :: {
-		__type: "ReplicatedTable",
-		__value: { [any]: any },
-		__table: { [any]: any },
-		__onChange: (Path: { [number]: { Key: string, IsNumber: boolean } }, Value: any, Action: string) -> nil,
-		__oldtable: { [any]: any },
-		__indicies: { string | number }?,
-		get: (self: ReplicatedTable) -> { [any]: any },
-		Get: (self: ReplicatedTable) -> { [any]: any },
-		insert: (self: ReplicatedTable, ...any) -> nil,
-		Insert: (self: ReplicatedTable, ...any) -> nil,
-		remove: (self: ReplicatedTable, Index: number) -> nil,
-		Remove: (self: ReplicatedTable, Index: number) -> nil,
-		destroy: (self: ReplicatedTable) -> nil,
-		Destroy: (self: ReplicatedTable) -> nil,
-	},
-	{}
-))
-
 local ValidKeyTypes = { "string", "number" }
 
-local CreateReplicatedTable
+local CreateReplicatedTable: any
 
-local function Get(self: ReplicatedTable)
+local function Get(self: Types.ReplicatedTable)
 	return CopyDeep(self.__table)
 end
 
-local function Insert(self: ReplicatedTable, ...: any)
+local function Insert(self: Types.ReplicatedTable, ...: any)
 	self.__oldtable = self:Get()
+
 	local Args = { ... }
 	local InsertIndices = table.clone(self.__indicies or {})
 	local Index = if #Args > 1 then Args[1] else #self.__table + 1
@@ -56,8 +39,9 @@ local function Insert(self: ReplicatedTable, ...: any)
 	self.__onChange(Serializer.ConvertToPacket(Path), _Value, "Insert")
 end
 
-local function Remove(self: ReplicatedTable, Index: number)
+local function Remove(self: Types.ReplicatedTable, Index: number)
 	self.__oldtable = self:Get()
+	
 	local _Indicies = table.clone(self.__indicies or {})
 	_Indicies[#_Indicies + 1] = Index
 	local _Value = table.remove(self.__table, Index)
@@ -72,21 +56,21 @@ local function Remove(self: ReplicatedTable, Index: number)
 	self.__onChange(Serializer.ConvertToPacket(Path), _Value, "Remove")
 end
 
-local function Destroy(self: ReplicatedTable)
+local function Destroy(self: Types.ReplicatedTable)
 	for _, Value in self.__value do
 		if Value.__type == "ReplicatedTable" then
 			Value:Destroy()
 		end
 	end
 
-	table.clear(self)
+	table.clear(self :: any)
 end
 
 CreateReplicatedTable = function(
 	Table: { [any]: any },
 	Indicies: { string | number }?,
 	OnChange: (Path: { [number]: { Key: string, IsNumber: boolean } }, Value: any, Action: string) -> nil
-): ReplicatedTable
+): Types.ReplicatedTable
 	local Id = HttpService:GenerateGUID(false):sub(1, 7)
 
 	local ReplicatedTable = setmetatable({
@@ -120,8 +104,7 @@ CreateReplicatedTable = function(
 			_Indicies[#_Indicies + 1] = Key
 
 			if IsTable then
-				local NewReplicatedTable = CreateReplicatedTable(Value, _Indicies, OnChange)
-				rawset(self.__value, Key, NewReplicatedTable)
+				rawset(self.__value, Key, CreateReplicatedTable(Value, _Indicies, OnChange))
 			end
 			
 			if Sift.Array.is(Table) and Value == nil then
@@ -221,7 +204,11 @@ CreateReplicatedTable = function(
 	rawset(ReplicatedTable, "Destroy", Destroy)
 	rawset(ReplicatedTable, "destroy", Destroy)
 
-	return ReplicatedTable
+	return ReplicatedTable :: any
 end
 
-return CreateReplicatedTable
+return CreateReplicatedTable :: (
+	Table: { [any]: any },
+	Indicies: { string | number }?,
+	OnChange: (Path: { [number]: { Key: string, IsNumber: boolean } }, Value: any, Action: string) -> nil
+) -> Types.ReplicatedTable

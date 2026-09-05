@@ -10,7 +10,7 @@ local function ConvertToPacket(Info)
 			if _type == "table" and Key.IsNumber then
 				continue
 			else
-				error("Invalid key type: " .. _type .. ". Expected 'string' or 'number'.")
+				error(`Invalid key type: {_type}. Expected 'string' or 'number'.`)
 			end
 		end
 

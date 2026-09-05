@@ -4,8 +4,9 @@
 # New tools can be added by running `rokit add <tool>` in a terminal.
 
 [tools]
-rojo = "rojo-rbx/rojo@7.6.1"
+rojo = "rojo-rbx/rojo@7.7.0"
 wally = "UpliftGames/wally@0.3.2"
-blink = "1Axen/blink@0.18.6"
-selene = "Kampfkarren/selene@0.29.0"
-StyLua = "JohnnyMorganz/StyLua@2.3.1"
+blink = "1Axen/blink@0.18.8"
+selene = "Kampfkarren/selene@0.31.0"
+stylua = "JohnnyMorganz/StyLua@2.5.2"
+luau-lsp = "JohnnyMorganz/luau-lsp@1.69.0"

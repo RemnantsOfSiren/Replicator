@@ -39,6 +39,15 @@ function Replica:ListenToKeyRemoved(Path: Types.ValidPath, Callback: (...any) ->
 	local ParsedPath = Parser(Path)
 
 	return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
+		if #ParsedPath == 1 and ParsedPath[1] == "" then
+			local Key = ChangedPath[1]
+			if NewValue[Key] then
+				return
+			end
+			task.spawn(Callback, Key, OldValue[Key])
+			return
+		end
+
 		if not IsLooseEqual(ChangedPath, ParsedPath) then
 			return
 		end
@@ -68,6 +77,15 @@ function Replica:ListenToNewKey(Path: Types.ValidPath, Callback: (...any) -> nil
 	local ParsedPath = Parser(Path)
 
 	return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
+		if #ParsedPath == 1 and ParsedPath[1] == "" then
+			local Key = ChangedPath[1]
+			if OldValue[Key] then
+				return
+			end
+			task.spawn(Callback, Key, NewValue[Key])
+			return
+		end
+
 		if not IsLooseEqual(ChangedPath, ParsedPath) then
 			return
 		end
@@ -96,6 +114,15 @@ function Replica:ListenToChange(Path: Types.ValidPath, Callback: (...any) -> nil
 	local ParsedPath = Parser(Path)
 
 	return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
+		if #ParsedPath == 1 and ParsedPath[1] == "" then
+			Logger(
+				"Warn",
+				"This is essentially just listen to raw, consider using that instead as it's more efficient."
+			)
+			task.spawn(Callback, NewValue, if SuppressOld then nil else OldValue)
+			return
+		end
+
 		if not IsLooseEqual(ChangedPath, ParsedPath) then
 			return
 		end
@@ -154,15 +181,16 @@ function Replica:AddCleanupMethod(Cleanup: any, CleanupMethod: (string | boolean
 	return self.__Cleaner:Add(Cleanup, CleanupMethod)
 end
 
-function Replica.new(Config: Types.Config): Replica
+function Replica.new(Config: Types.Config): Replica?
 	if Config.WriteLib and not Config.WriteLib:IsA("ModuleScript") then
-		return Logger("Warn", "WriteLib must be a ModuleScript.")
+		Logger("Warn", "WriteLib must be a ModuleScript.")
+		return nil
 	end
 
 	local Cleaner = Trove.new()
 
 	local self = setmetatable({
-		Id = if RunService:IsServer() then `{Config.Name}:{HttpService:GenerateGUID(false):sub(1, 7)}` else Config.Id,
+		Id = if RunService:IsServer() then `{Config.Name}:{HttpService:GenerateGUID(false):sub(1, 7)}` else Config.Id :: string,
 		To = if RunService:IsServer() then Config.To else nil,
 		Name = Config.Name,
 		Tags = Config.Tags,
@@ -178,13 +206,15 @@ function Replica.new(Config: Types.Config): Replica
 		__WriteLib = Config.WriteLib and require(Config.WriteLib) :: { [any]: any } or nil,
 	}, Replica)
 
-	self.__Cleaner:Connect(self.Destroying, function()
+	self.__Cleaner:Connect(self.Destroying :: any, function()
 		if self.__Cleaner then
 			self.__Cleaner:Destroy()
 		end
 	end)
 
-	return self
+	-- The listener methods live on the `Replica` metatable rather than on `self`
+	-- directly, so cast to satisfy the (now non-optional) method fields on the type.
+	return self :: Replica
 end
 
 return Replica

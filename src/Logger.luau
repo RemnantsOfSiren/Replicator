@@ -22,4 +22,6 @@ return function(Execution: Level, ...: any)
 
 		error("[[Replicator-Log]]: " .. Str .. debug.traceback("", 10))
 	end
+
+	return
 end

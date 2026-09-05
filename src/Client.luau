@@ -1,21 +1,23 @@
 --!strict
-local Sift = require(script.Parent.Parent.Sift) :: any
-local VoidSentry = require(script.Parent.Parent.VoidSentry) :: any
+local Repo = script.Parent.Parent :: Instance
+local Sift = require(Repo:WaitForChild("Sift")) :: any
+local Dynamo = require(Repo:WaitForChild("Dynamo")) :: any
 
-local Dynamic = VoidSentry.Dynamic
-
-local Logger = require(script.Parent.Logger)
 local Net = require(script.Parent.Net.Client)
 local Types = require(script.Parent.Types)
+local Logger = require(script.Parent.Logger)
 local Serializer = require(script.Parent.Serializer)
 
 local Dictionary = Sift.Dictionary
 local CopyDeep = Dictionary.copyDeep
 
-local Replicas = {}
-local Replicators = {}
+local Replicas: { [string]: Types.ClientReplica } = {}
+local Replicators: { [string]: any } = {}
 
 local function FindReplicaById(Id: string?): Types.ClientReplica?
+	if not Id then
+		return nil
+	end
 	return Replicas[Id]
 end
 
@@ -54,7 +56,7 @@ function ClientReplica:Fire(...)
 
 	Net.fireServerEvent.fire({
 		Id = self.Id,
-		Args = Dynamic.serialize(nil, nil, Args),
+		Args = Dynamo.Serialize1(Args),
 	})
 end
 
@@ -67,9 +69,10 @@ end
 
 export type ClientReplica = Replica.Replica & typeof(setmetatable({} :: Types.ClientReplica, ClientReplica))
 
-local function NewReplica(Config: Types.ClientConfig): ClientReplica
+local function NewReplica(Config: Types.ClientConfig): ClientReplica?
 	if Config.WriteLib and not Config.WriteLib:IsA("ModuleScript") then
-		return Logger("Warn", "WriteLib must be a ModuleScript.")
+		Logger("Warn", "WriteLib must be a ModuleScript.")
+		return nil
 	end
 
 	local Parent
@@ -81,7 +84,9 @@ local function NewReplica(Config: Types.ClientConfig): ClientReplica
 		until Parent
 	end
 
-	local self = setmetatable(Replica.new(Config), ClientReplica) :: ClientReplica
+	Config.Tags = Config.Tags and Dynamo.Deserialize1(Config.Tags)
+
+	local self: ClientReplica = setmetatable(Replica.new(Config :: any) :: any, ClientReplica) :: any
 
 	Replicas[Config.Id] = self
 
@@ -91,7 +96,7 @@ end
 local Replicator = {}
 Replicator.__index = Replicator
 
-function Replicator:AddListener(Callback)
+function Replicator.AddListener(self: any, Callback: (...any) -> nil)
 	table.insert(self.__Listeners, Callback)
 
 	for _, _Replica in pairs(self.__Replicas) do
@@ -108,7 +113,7 @@ function Replicator:AddListener(Callback)
 	end
 end
 
-function Replicator:AddReplica(_Replica)
+function Replicator.AddReplica(self: any, _Replica: any)
 	if table.find(self.__Replicas, _Replica.Id) then
 		return
 	elseif _Replica.Name ~= self.Name then
@@ -141,7 +146,7 @@ local function NewReplicator(Name: string, IsParent: boolean?)
 end
 
 Net.createReplica.on(function(_Replica)
-	local Data = Dynamic.deserialize(nil, nil, _Replica.Data)
+	local Data = Dynamo.Deserialize1(_Replica.Data)
 
 	if Data then
 		_Replica.Data = Data
@@ -176,7 +181,7 @@ Net.fireClientEvent.on(function(Data)
 
 	if _Replica then
 		local Buffer = Data.Args or {}
-		local Args = Dynamic.deserialize(nil, nil, Buffer)
+		local Args = Dynamo.Deserialize1(Buffer)
 		_Replica.__Fired:Fire(unpack(Args))
 	end
 end)
@@ -186,7 +191,7 @@ Net.replicaWrite.on(function(Data)
 
 	if _Replica then
 		local Buffer = Data.Args or {}
-		local Args = Dynamic.deserialize(nil, nil, Buffer)
+		local Args = Dynamo.Deserialize1(Buffer)
 		_Replica.__Write:Fire(Data.Method, unpack(Args))
 	end
 end)
@@ -200,7 +205,7 @@ Net.changeParent.on(function(Info)
 	end
 end)
 
-Net.updateReplica.on(function(Packet: {Id: string, Change: Types.ChangePacket})
+Net.updateReplica.on(function(Packet: any)
 	local Id = Packet.Id
 	
 	local _Replica = Replicas[Id]
@@ -226,7 +231,7 @@ Net.updateReplica.on(function(Packet: {Id: string, Change: Types.ChangePacket})
 		_Data = _Data[Key]
 	end
 
-	local Value = if _Packet.Value then Dynamic.deserialize(nil, nil, _Packet.Value) else nil
+	local Value = if _Packet.Value then Dynamo.Deserialize1(_Packet.Value) else nil
 
 	if _Packet.Action == "Set" then
 		_Data[_Path[#_Path]] = Value
@@ -255,7 +260,7 @@ task.defer(function()
 
 		if not Replicas[_Replica.Id] then
 			if _Replica.Data then
-				_Replica.Data = Dynamic.deserialize(nil, nil, _Replica.Data)
+				_Replica.Data = Dynamo.Deserialize1(_Replica.Data)
 			end
 
 			task.spawn(_Replicator.AddReplica, _Replicator, NewReplica(_Replica :: any))

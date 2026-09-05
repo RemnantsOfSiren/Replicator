@@ -1,11 +1,11 @@
 --!strict
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Sift = require(script.Parent.Parent.Sift) :: any
-local Signal = require(script.Parent.Parent.Signal) :: any
-local VoidSentry = require(script.Parent.Parent.VoidSentry) :: any
-
-local Dynamic = VoidSentry.Dynamic
+local Repo = script.Parent.Parent :: Instance
+local Sift = require(Repo:WaitForChild("Sift")) :: any
+local Signal = require(Repo:WaitForChild("Signal")) :: any
+local Dynamo = require(Repo:WaitForChild("Dynamo")) :: any
 
 local Net = require(script.Parent.Net.Server)
 local Types = require(script.Parent.Types)
@@ -23,21 +23,15 @@ local ServerReplica = {}
 ServerReplica.__index = ServerReplica
 setmetatable(ServerReplica, { __index = Replica })
 
-local function CreateReplica(player, replica)
-	local Buffer = nil
-
-	if replica.Data then
-		Buffer = Dynamic.serialize(nil, nil, replica.Data:Get())
-	end
-
-	Net.createReplica.fire(player, {
-		Id = replica.Id,
-		Name = replica.Name,
-		Tags = replica.Tags,
-		Data = Buffer,
-		Parent = if replica.__Parent then replica.__Parent.Id else nil,
-		IsParent = replica.__IsParent,
-		WriteLib = replica.WriteLib,
+local function CreateReplica(Player: Player, _Replica: Types.ServerReplica)
+	Net.createReplica.fire(Player, {
+		Id = _Replica.Id,
+		Name = _Replica.Name,
+		Tags = _Replica.Tags and Dynamo.Serialize1(_Replica.Tags),
+		Data = _Replica.Data and Dynamo.Serialize1(_Replica.Data:Get()),
+		Parent = if _Replica.__Parent then _Replica.__Parent.Id else nil,
+		IsParent = _Replica.__IsParent,
+		WriteLib = _Replica.WriteLib,
 	})
 end
 
@@ -53,9 +47,9 @@ end
 ]=]
 function ServerReplica:Write(Method: string, ...: any)
 	if self.__WriteLib and self.__WriteLib[Method] then
-		local Return = { self.__WriteLib[Method](self, ...) }
+		local Return = { (self.__WriteLib[Method] :: (...any) -> ...any)(self, ...) }
 
-		local Buffer = Dynamic.serialize(nil, nil, { ... })
+		local Buffer = Dynamo.Serialize1({ ... })
 		local Packet = { Method = Method, Args = Buffer }
 
 		self.__Fire(Net.replicaWrite, Packet)
@@ -76,7 +70,7 @@ end
 ]=]
 function ServerReplica:SetValue(path: Types.ValidPath, value: any)
 	local ParsedPath = Parser(path)
-	local Pointer = self.Data
+	local Pointer: any = self.Data
 
 	for Index, Key in ParsedPath do
 		if Index == #ParsedPath then
@@ -84,6 +78,7 @@ function ServerReplica:SetValue(path: Types.ValidPath, value: any)
 		end
 
 		Pointer = Pointer[Key]
+		
 		if not Pointer then
 			return
 		end
@@ -133,7 +128,7 @@ end
 ]=]
 function ServerReplica:Fire(...)
 	local Args = { ... }
-	local Buffer = Dynamic.serialize(nil, nil, Args)
+	local Buffer = Dynamo.Serialize1(Args)
 	self.__Fire(Net.fireClientEvent, { Args = Buffer })
 end
 
@@ -180,7 +175,7 @@ end
 	This should only ever be intentionally called from the Server.
 	-- Credit to @Fuse for implementation of this function.
 ]=]
-function ServerReplica:ReplicateFor(player: Player)
+function ServerReplica.ReplicateFor(self: any, player: Player)
 	-- Ensure player can be replicated to
 	if self.To == "All" then
 		return warn(`Attempt to update replication when To="All".\n{debug.traceback()}`)
@@ -197,7 +192,7 @@ function ServerReplica:ReplicateFor(player: Player)
 		self.To = { self.To }
 	end
 
-	table.insert(self.To, player)
+	table.insert(self.To :: { Player }, player)
 	self.__ReplicateToChanged:Fire(Previous, self.To)
 
 	-- Replicate main replica to player
@@ -250,17 +245,17 @@ end
 	This should only ever be intentionally called from the Server.
 	-- Credit to @Fuse for implementation of this function.
 ]=]
-function ServerReplica:DestroyFor(Player: Player)
+function ServerReplica.DestroyFor(self: any, Player: Player)
 	if self.To == "All" then
 		return warn(`Attempt to destroy replication for {Player} when To="All".\n{debug.traceback()}`)
 	end
 
-	if typeof(self.To) == "Instance" then
+	if typeof(self.To) == "Instance" and self.To == Player then
 		self.To = nil
 	elseif typeof(self.To) == "table" then
-		local index = table.find(self.To, Player)
-		if index then
-			table.remove(self.To, index)
+		local Index = table.find(self.To, Player)
+		if Index then
+			table.remove(self.To, Index)
 		end
 	end
 
@@ -370,10 +365,8 @@ local CreateReplicatedTable = require(script.Parent.ReplicatedTable)
 
 export type ServerReplica = Replica.Replica & typeof(setmetatable({} :: Types.ServerReplica, ServerReplica))
 
---local Changes: Types.Packet = {} :: Types.Packet
-
 local function NewReplica(Config: Types.ServerConfig): ServerReplica
-	local Parent: Types.ServerReplica? = Config.Parent :: Types.ServerReplica?
+	local Parent: ServerReplica? = Config.Parent :: ServerReplica?
 
 	if Parent and Parent.To then
 		Config.To = Parent.To
@@ -381,19 +374,19 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 		Config.To = "All"
 	end
 
-	local self = setmetatable(Replica.new(Config), ServerReplica) :: ServerReplica
+	local self: ServerReplica = setmetatable(Replica.new(Config) :: any, ServerReplica) :: any
 
 	self.__ReplicateToChanged = Signal.new()
 
-	self.__ReplicateToChanged:Connect(function(Previous, New)
+	self.__ReplicateToChanged:Connect(function(Previous: any, New: any)
 		if Previous == "All" then
-			Previous = game.Players:GetPlayers()
+			Previous = Players:GetPlayers()
 		elseif typeof(Previous) == "Instance" then
 			Previous = { Previous }
 		end
 
 		if New == "All" then
-			New = game.Players:GetPlayers()
+			New = Players:GetPlayers()
 		elseif typeof(New) == "Instance" then
 			New = { New }
 		end
@@ -406,7 +399,7 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 
 		for _, Player in New do
 			if not table.find(Previous, Player) then
-				CreateReplica(Player, self :: { [string | number]: any })
+				CreateReplica(Player, self)
 			end
 		end
 	end)
@@ -427,7 +420,7 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 		self.Data = self:AddCleanupMethod(CreateReplicatedTable(Config.Data, nil, function(Packet, Value, Action)
 			self.__Change:Fire(Serializer.ConvertToPath(Packet), self.Data:Get(), self.Data.__oldtable)
 
-			local Buffer = Dynamic.serialize(nil, nil, Value)
+			local Buffer = if Value ~= nil then Dynamo.Serialize1(Value) else nil
 
 			self.__Fire(Net.updateReplica, {
 				Change = {
@@ -436,13 +429,15 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 					Action = Action,
 				},
 			})
-		end), "Destroy")
+
+			return nil
+		end), "Destroy") :: Types.ReplicatedTable
 	end
 
 	if
 		Config.WriteLib
 		and Config.WriteLib:IsA("ModuleScript")
-		and Config.WriteLib:IsDescendantOf(game.ReplicatedStorage)
+		and Config.WriteLib:IsDescendantOf(ReplicatedStorage)
 	then
 		self.WriteLib = Config.WriteLib
 		self.__WriteLib = require(self.WriteLib) :: { [string]: (self: ServerReplica, ...any) -> unknown }
@@ -452,8 +447,8 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 
 	self.__Fire(Net.createReplica, {
 		Name = self.Name,
-		Tags = self.Tags,
-		Data = self.Data and Dynamic.serialize(nil, nil, self.Data:Get()),
+		Tags = self.Tags and Dynamo.Serialize1(self.Tags),
+		Data = self.Data and Dynamo.Serialize1(self.Data:Get()),
 		Parent = Config.Parent and Config.Parent.Id,
 		WriteLib = self.WriteLib,
 	})
@@ -474,17 +469,17 @@ Net.getInitialReplicas.on(function(Player: Player)
 	AlreadyInitialized[Player.Name] = true
 
 	return Dictionary.values(Dictionary.map(
-		Dictionary.filter(Replicas, function(_Replica)
+		Dictionary.filter(Replicas, function(_Replica: Types.ServerReplica)
 			return _Replica.To == "All"
 				or (typeof(_Replica.To) == "table" and table.find(_Replica.To, Player))
 				or (_Replica.To :: Player) == Player
 		end),
-		function(_Replica)
+		function(_Replica: Types.ServerReplica)
 			return {
 				Id = _Replica.Id,
 				Name = _Replica.Name,
-				Tags = _Replica.Tags,
-				Data = if _Replica.Data then Dynamic.serialize(nil, nil, _Replica.Data:Get()) else nil,
+				Tags = if _Replica.Tags then Dynamo.Serialize1(_Replica.Tags) else nil,
+				Data = if _Replica.Data then Dynamo.Serialize1(_Replica.Data:Get()) else nil,
 				Parent = if _Replica.__Parent then _Replica.__Parent.Id else nil,
 				IsParent = _Replica.__IsParent,
 				WriteLib = _Replica.WriteLib,
@@ -494,11 +489,11 @@ Net.getInitialReplicas.on(function(Player: Player)
 end)
 
 Net.fireServerEvent.on(function(Player, Packet)
-	local _Replica = Replicas[Packet.Id]
+	local _Replica = Replicas[Packet.Id] :: Types.ServerReplica?
 
 	if _Replica then
 		local Buffer = Packet.Args or {}
-		local Args = Dynamic.deserialize(nil, nil, Buffer)
+		local Args = Dynamo.Deserialize1(Buffer)
 		_Replica.__Fired:Fire(Player, unpack(Args))
 	end
 end)
