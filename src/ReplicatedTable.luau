@@ -69,7 +69,7 @@ end
 CreateReplicatedTable = function(
 	Table: { [any]: any },
 	Indicies: { string | number }?,
-	OnChange: (Path: { [number]: { Key: string, IsNumber: boolean } }, Value: any, Action: string) -> nil
+	OnChange: (Path: { Types.PacketKey }, Value: any, Action: string) -> ()
 ): Types.ReplicatedTable
 	local Id = HttpService:GenerateGUID(false):sub(1, 7)
 
@@ -210,5 +210,5 @@ end
 return CreateReplicatedTable :: (
 	Table: { [any]: any },
 	Indicies: { string | number }?,
-	OnChange: (Path: { [number]: { Key: string, IsNumber: boolean } }, Value: any, Action: string) -> nil
+	OnChange: (Path: { Types.PacketKey }, Value: any, Action: string) -> ()
 ) -> Types.ReplicatedTable

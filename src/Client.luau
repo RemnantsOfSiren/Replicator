@@ -42,12 +42,12 @@ end
 	@method OnClientEvent
 	@within Replica
 	@client
-	@param Callback (...any) -> nil
-	@return { Disconnect: () -> nil }
+	@param Callback (...any) -> ()
+	@return Connection
 
 	Listens for a client event, and fires the callback with the arguments passed.
 ]=]
-function ClientReplica:OnClientEvent(Callback: (...any) -> nil): { Disconnect: () -> nil }
+function ClientReplica:OnClientEvent(Callback: (...any) -> ()): Types.Connection
 	return self.__Fired:Connect(Callback)
 end
 
@@ -67,9 +67,7 @@ function ClientReplica:Destroy()
 	table.clear(self)
 end
 
-export type ClientReplica = Replica.Replica & typeof(setmetatable({} :: Types.ClientReplica, ClientReplica))
-
-local function NewReplica(Config: Types.ClientConfig): ClientReplica?
+local function NewReplica(Config: Types.ClientConfig): Types.ClientReplica?
 	if Config.WriteLib and not Config.WriteLib:IsA("ModuleScript") then
 		Logger("Warn", "WriteLib must be a ModuleScript.")
 		return nil
@@ -86,17 +84,17 @@ local function NewReplica(Config: Types.ClientConfig): ClientReplica?
 
 	Config.Tags = Config.Tags and Dynamo.Deserialize1(Config.Tags)
 
-	local self: ClientReplica = setmetatable(Replica.new(Config :: any) :: any, ClientReplica) :: any
+	local self = setmetatable(Replica.new(Config :: any) :: any, ClientReplica) :: any
 
 	Replicas[Config.Id] = self
 
-	return self
+	return self :: Types.ClientReplica
 end
 
 local Replicator = {}
 Replicator.__index = Replicator
 
-function Replicator.AddListener(self: any, Callback: (...any) -> nil)
+function Replicator.AddListener(self: any, Callback: (...any) -> ())
 	table.insert(self.__Listeners, Callback)
 
 	for _, _Replica in pairs(self.__Replicas) do
@@ -233,10 +231,14 @@ Net.updateReplica.on(function(Packet: any)
 
 	local Value = if _Packet.Value then Dynamo.Deserialize1(_Packet.Value) else nil
 
+	local Key = _Path[#_Path]
+
 	if _Packet.Action == "Set" then
-		_Data[_Path[#_Path]] = Value
+		_Data[Key] = Value
 	elseif _Packet.Action == "Remove" then
-		table.remove(_Data, _Path[#_Path])
+		-- A "Remove" only ever comes from `ReplicatedTable:Remove(Index)`, so the
+		-- trailing key is always an array index.
+		table.remove(_Data, Key :: number)
 	elseif _Packet.Action == "Insert" then
 		table.insert(_Data, Value)
 	end
@@ -273,14 +275,14 @@ end)
     @within Replicator
     @client
     @param Name string
-    @param Callback (Replica: Replica) -> nil
-    @return () -> nil
+    @param Callback (Replica: ClientReplica) -> ()
+    @return () -> ()
 
     Listens to new replicas being created, and fires the callback with the new replica.
     returns a function that when called, disconnects the listener.
 ]=]
 return table.freeze({
-	ListenToNewReplica = function(Name: string, Callback: (...any) -> nil)
+	ListenToNewReplica = function(Name: string, Callback: (...any) -> ())
 		local Listener
 
 		local Disconnector = function()

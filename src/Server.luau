@@ -1,4 +1,5 @@
 --!strict
+--!optimize 2
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -109,12 +110,12 @@ end
 	@method OnServerEvent
 	@within Replica
 	@server
-	@param Callback (Player: Player, ...any) -> nil
-	@return { Disconnect: () -> nil }
+	@param Callback (Player: Player, ...any) -> ()
+	@return Connection
 
 	Connects a function to the server event, which will be fired when the client sends a request.
 ]=]
-function ServerReplica:OnServerEvent(Callback: (Player: Player, ...any) -> nil): { Disconnect: () -> nil }
+function ServerReplica:OnServerEvent(Callback: (Player: Player, ...any) -> ()): Types.Connection
 	return self.__Fired:Connect(Callback)
 end
 
@@ -429,8 +430,6 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 					Action = Action,
 				},
 			})
-
-			return nil
 		end), "Destroy") :: Types.ReplicatedTable
 	end
 

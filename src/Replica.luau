@@ -1,4 +1,5 @@
 --!strict
+--!optimize 2
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 
@@ -10,8 +11,6 @@ local Parser = require(script.Parent.Parser)
 
 local Replica = {}
 Replica.__index = Replica
-
-export type Replica = typeof(setmetatable({} :: Types.Replica, Replica)) & {}
 
 local function IsReplicatedTable(Value: any): boolean
 	return type(Value) == "table" and Value.__type == "ReplicatedTable"
@@ -27,7 +26,7 @@ local function IsLooseEqual(ChangedPath, Path)
 	return true
 end
 
-function Replica:Write(Method: string, Callback: (...any) -> nil)
+function Replica:Write(Method: string, Callback: (...any) -> ())
 	return self.__Write:Connect(function(_Method: string, Args: { any })
 		if _Method == Method then
 			task.spawn(Callback, unpack(Args))
@@ -35,10 +34,10 @@ function Replica:Write(Method: string, Callback: (...any) -> nil)
 	end)
 end
 
-function Replica:ListenToKeyRemoved(Path: Types.ValidPath, Callback: (...any) -> nil)
+function Replica:ListenToKeyRemoved(Path: Types.ValidPath, Callback: (...any) -> ())
 	local ParsedPath = Parser(Path)
 
-	return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
+	return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue: any, OldValue: any)
 		if #ParsedPath == 1 and ParsedPath[1] == "" then
 			local Key = ChangedPath[1]
 			if NewValue[Key] then
@@ -73,10 +72,10 @@ function Replica:ListenToKeyRemoved(Path: Types.ValidPath, Callback: (...any) ->
 	end)
 end
 
-function Replica:ListenToNewKey(Path: Types.ValidPath, Callback: (...any) -> nil)
+function Replica:ListenToNewKey(Path: Types.ValidPath, Callback: (...any) -> ())
 	local ParsedPath = Parser(Path)
 
-	return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
+	return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue: any, OldValue: any)
 		if #ParsedPath == 1 and ParsedPath[1] == "" then
 			local Key = ChangedPath[1]
 			if OldValue[Key] then
@@ -110,10 +109,10 @@ function Replica:ListenToNewKey(Path: Types.ValidPath, Callback: (...any) -> nil
 	end)
 end
 
-function Replica:ListenToChange(Path: Types.ValidPath, Callback: (...any) -> nil, SuppressOld: boolean?)
+function Replica:ListenToChange(Path: Types.ValidPath, Callback: (...any) -> (), SuppressOld: boolean?)
 	local ParsedPath = Parser(Path)
 
-	return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
+	return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue: any, OldValue: any)
 		if #ParsedPath == 1 and ParsedPath[1] == "" then
 			Logger(
 				"Warn",
@@ -144,8 +143,8 @@ function Replica:ListenToChange(Path: Types.ValidPath, Callback: (...any) -> nil
 	end)
 end
 
-function Replica:ListenToRaw(Callback: (...any) -> nil)
-	return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue, OldValue)
+function Replica:ListenToRaw(Callback: (...any) -> ())
+	return self.__Change:Connect(function(ChangedPath: { string | number }, NewValue: any, OldValue: any)
 		for Index = 1, #ChangedPath do
 			local Key = ChangedPath[Index]
 			if Key then
@@ -160,7 +159,7 @@ function Replica:ListenToRaw(Callback: (...any) -> nil)
 	end)
 end
 
-function Replica:ObserveChange(Path: Types.ValidPath, Callback: (...any) -> nil)
+function Replica:ObserveChange(Path: Types.ValidPath, Callback: (...any) -> ())
 	local ParsedPath = Parser(Path)
 
 	local _Data = if IsReplicatedTable(self.Data) then self.Data:Get() else self.Data
@@ -181,7 +180,7 @@ function Replica:AddCleanupMethod(Cleanup: any, CleanupMethod: (string | boolean
 	return self.__Cleaner:Add(Cleanup, CleanupMethod)
 end
 
-function Replica.new(Config: Types.Config): Replica?
+function Replica.new(Config: Types.Config): Types.Replica?
 	if Config.WriteLib and not Config.WriteLib:IsA("ModuleScript") then
 		Logger("Warn", "WriteLib must be a ModuleScript.")
 		return nil
@@ -212,9 +211,7 @@ function Replica.new(Config: Types.Config): Replica?
 		end
 	end)
 
-	-- The listener methods live on the `Replica` metatable rather than on `self`
-	-- directly, so cast to satisfy the (now non-optional) method fields on the type.
-	return self :: Replica
+	return self :: Types.Replica
 end
 
 return Replica

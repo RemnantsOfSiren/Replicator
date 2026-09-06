@@ -1,5 +1,5 @@
 {
     "editor.formatOnSave": true,
     "editor.defaultFormatter": "JohnnyMorganz.luau-lsp",
-    "luau-lsp.fflags.enableNewSolver": true,
+    "luau-lsp.fflags.enableNewSolver": true
 }

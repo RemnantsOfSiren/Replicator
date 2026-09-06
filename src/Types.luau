@@ -8,8 +8,6 @@ type Cleaner = typeof(Trove.new())
 export type ValidPath = { string | number } | string | number
 export type ToOptions = { Player } | Player | "All"
 
--- The object returned by any of the `ListenTo*` / `ObserveChange` methods.
--- Call `:Disconnect()` on it to stop listening.
 export type Connection = {
 	Connected: boolean,
 	Disconnect: (self: Connection) -> (),
@@ -30,37 +28,42 @@ export type Replica<T = any> = {
 	__Cleaner: Cleaner,
 	Destroying: Signal,
 
-	ListenToRaw: (self: Replica<T>, Callback: (...any) -> nil) -> Connection,
-	ObserveChange: (self: Replica<T>, Path: ValidPath, Callback: (...any) -> nil) -> Connection,
-	ListenToChange: (self: Replica<T>, Path: ValidPath, Callback: (...any) -> nil, SuppressOld: boolean?) -> Connection,
-	ListenToNewKey: (self: Replica<T>, Path: ValidPath, Callback: (...any) -> nil) -> Connection,
+	ListenToRaw: (self: Replica<T>, Callback: (...any) -> ()) -> Connection,
+	ObserveChange: (self: Replica<T>, Path: ValidPath, Callback: (...any) -> ()) -> Connection,
+	ListenToChange: (self: Replica<T>, Path: ValidPath, Callback: (...any) -> (), SuppressOld: boolean?) -> Connection,
+	ListenToNewKey: (self: Replica<T>, Path: ValidPath, Callback: (...any) -> ()) -> Connection,
 	AddCleanupMethod: (self: Replica<T>, Method: any, CleanupMethod: any?) -> any,
-	ListenToKeyRemoved: (self: Replica<T>, Path: ValidPath, Callback: (...any) -> nil) -> Connection,
+	ListenToKeyRemoved: (self: Replica<T>, Path: ValidPath, Callback: (...any) -> ()) -> Connection,
 }
 
 export type ReplicatedTable<T = any> = typeof(setmetatable(
 	{} :: {
+		[any]: any,
 		__type: "ReplicatedTable",
 		__value: { [any]: any } & T,
 		__table: T,
-		__onChange: (Path: { [number]: { Key: string, IsNumber: boolean } }, Value: any, Action: string) -> nil,
+		__onChange: (Path: { PacketKey }, Value: any, Action: string) -> (),
 		__oldtable: { [any]: any },
 		__indicies: { string | number }?,
-		Get: (self: ReplicatedTable<T>) -> any,
-		Insert: (self: ReplicatedTable<T>, Key: (string | number)?, Value: any) -> nil,
-		Remove: (self: ReplicatedTable<T>, Key: string | number) -> nil,
+		Get: (self: ReplicatedTable<T>) -> T,
+		Insert: (self: ReplicatedTable<T>, IndexOrValue: any, Value: any?) -> (),
+		Remove: (self: ReplicatedTable<T>, Index: number) -> (),
+		Destroy: (self: ReplicatedTable<T>) -> (),
 	},
-{}))
+	{} :: {
+		__iter: (self: ReplicatedTable<T>) -> () -> (any, any, (Value: any) -> ()),
+	}
+))
 
 export type RemoteEvent = {
-	fire: (Player: Player, Packet: { [any]: any }) -> nil,
-	fireAll: (Packet: { [any]: any }) -> nil,
-	fireList: (Players: { Player }, Packet: { [any]: any }) -> nil,
+	fire: (Player: Player, Packet: { [any]: any }) -> (),
+	fireAll: (Packet: { [any]: any }) -> (),
+	fireList: (Players: { Player }, Packet: { [any]: any }) -> (),
 }
 
 export type ServerReplica<T = any> = Replica<T> & {
 	Data: ReplicatedTable<T>,
-	__Fire: (Event: RemoteEvent, Packet: { [any]: any }) -> nil,
+	__Fire: (Event: RemoteEvent, Packet: { [any]: any }) -> (),
 	__Ready: boolean?,
 	__Parent: ServerReplica<T>?,
 	__IsParent: boolean?,
@@ -71,13 +74,13 @@ export type ServerReplica<T = any> = Replica<T> & {
 
 	Fire: (self: ServerReplica<T>, ...any) -> (),
 	Write: (self: ServerReplica<T>, Method: string, ...any) -> ...any,
-	Destroy: (self: ServerReplica<T>) -> nil,
-	SetValue: (self: ServerReplica<T>, Path: ValidPath, Value: any) -> nil,
-	SetParent: (self: ServerReplica<T>, Parent: ServerReplica<T>?) -> nil,
-	DestroyFor: (self: ServerReplica<T>, Player: Player) -> nil,
+	Destroy: (self: ServerReplica<T>) -> (),
+	SetValue: (self: ServerReplica<T>, Path: ValidPath, Value: any) -> (),
+	SetParent: (self: ServerReplica<T>, Parent: ServerReplica<T>) -> (),
+	DestroyFor: (self: ServerReplica<T>, Player: Player) -> (),
 	GetChildren: (self: ServerReplica<T>) -> { [string]: ServerReplica<T> },
-	ReplicateFor: (self: ServerReplica<T>, Player: Player) -> nil,
-	OnServerEvent: (self: ServerReplica<T>, Callback: (Player: Player, ...any) -> nil) -> Connection,
+	ReplicateFor: (self: ServerReplica<T>, Player: Player) -> (),
+	OnServerEvent: (self: ServerReplica<T>, Callback: (Player: Player, ...any) -> ()) -> Connection,
 }
 
 export type ClientReplica<T = any> = Replica<T> & {
@@ -86,11 +89,11 @@ export type ClientReplica<T = any> = Replica<T> & {
 	__IsParent: boolean?,
 	__Parent: ClientReplica<T>?,
 
-	Write: (self: ClientReplica<T>, Method: string, Callback: (...any) -> nil) -> Connection,
+	Write: (self: ClientReplica<T>, Method: string, Callback: (...any) -> ()) -> Connection,
 	Fire: (self: ClientReplica<T>, ...any) -> (),
-	Destroy: (self: ClientReplica<T>) -> nil,
+	Destroy: (self: ClientReplica<T>) -> (),
 	GetChildren: (self: ClientReplica<T>) -> { [string]: ClientReplica<T> },
-	OnClientEvent: (self: ClientReplica<T>, Callback: (...any) -> nil) -> Connection,
+	OnClientEvent: (self: ClientReplica<T>, Callback: (...any) -> ()) -> Connection,
 }
 
 export type PacketKey = {
@@ -99,9 +102,9 @@ export type PacketKey = {
 }
 
 export type ChangePacket = {
-	Path: { [number]: PacketKey },
-    Value: unknown?,
-    Action: string,
+	Path: { PacketKey },
+	Value: unknown?,
+	Action: string,
 }
 
 export type Packet = {
@@ -119,22 +122,21 @@ export type Config<T = any> = {
 	IsParent: boolean?,
 }
 
-export type ServerConfig = Config<any> & {
-	To: ToOptions,
+export type ServerConfig<T = any> = Config<T> & {
 	Parent: ServerReplica<any>?,
 }
 
-export type ClientConfig = Config<any> & {
+export type ClientConfig<T = any> = Config<T> & {
 	Id: string,
 	Parent: string?,
 }
 
 export type ServerReplicator = {
-	NewReplica: <T>(Config: Config<T>) -> ServerReplica<T>?,
+	NewReplica: (Config: ServerConfig<any>) -> ServerReplica<any>?,
 }
 
 export type ClientReplicator = {
-	ListenToNewReplica: <T>(Name: string, Callback: (Replica: ClientReplica<T>) -> nil) -> () -> (),
+	ListenToNewReplica: (Name: string, Callback: (Replica: ClientReplica<any>) -> ()) -> () -> (),
 }
 
 return {}

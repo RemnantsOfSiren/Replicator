@@ -13,35 +13,20 @@ local Logger = require(script.Logger)
 export type ServerReplicator = Types.ServerReplicator
 export type ClientReplicator = Types.ClientReplicator
 
-export type ServerReplica = Types.ServerReplica
-export type ClientReplica = Types.ClientReplica
+export type Replica<T = any> = Types.Replica<T>
+export type ServerReplica<T = any> = Types.ServerReplica<T>
+export type ClientReplica<T = any> = Types.ClientReplica<T>
 
-export type Config = Types.Config
-export type ServerConfig = Types.ServerConfig
-export type ClientConfig = Types.ClientConfig
+export type Config<T = any> = Types.Config<T>
+export type ServerConfig<T = any> = Types.ServerConfig<T>
+export type ClientConfig<T = any> = Types.ClientConfig<T>
 
-export type ReplicatedTable = Types.ReplicatedTable
+export type ReplicatedTable<T = any> = Types.ReplicatedTable<T>
 export type Connection = Types.Connection
 export type ValidPath = Types.ValidPath
 export type ToOptions = Types.ToOptions
 
-local IsServer = game:GetService("RunService"):IsServer()
-
 return {
-	Server = (if IsServer
-		then require(script.Server)
-		else {
-			NewReplica = function(_: Types.Config)
-				Logger("Warn", "Attempting to call Server function on the Client!")
-				return nil
-			end,
-		}) :: ServerReplicator,
-	Client = (if not IsServer
-		then require(script.Client)
-		else {
-			ListenToNewReplica = function(_Name: string, _Callback: (ClientReplica) -> ())
-				Logger("Warn", "Attempting to call Client function on the Server!")
-				return function() end
-			end,
-		}) :: ClientReplicator,
+	Server = require(script.Server),
+	Client = require(script.Client)
 }

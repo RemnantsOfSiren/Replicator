@@ -1,6 +1,9 @@
+--!strict
+local Types = require(script.Parent.Types)
+
 local ValidKey = { "string", "number" }
 
-local function ConvertToPacket(Info)
+local function ConvertToPacket(Info: { any }): { Types.PacketKey }
 	local Packet = {}
 
 	for _, Key in pairs(Info) do
@@ -16,18 +19,18 @@ local function ConvertToPacket(Info)
 
 		table.insert(Packet, {
 			Key = tostring(Key),
-			IsNumber = type(Key) == "number",
+			IsNumber = _type == "number",
 		})
 	end
 
 	return Packet
 end
 
-local function ConvertToPath(Packet)
-	local Path = {}
+local function ConvertToPath(Packet: { Types.PacketKey }): { string | number }
+	local Path: { string | number } = {}
 
 	for _, PacketInfo in Packet do
-		table.insert(Path, if PacketInfo.IsNumber then tonumber(PacketInfo.Key) else PacketInfo.Key)
+		table.insert(Path, if PacketInfo.IsNumber then tonumber(PacketInfo.Key) :: number else PacketInfo.Key)
 	end
 
 	return Path
