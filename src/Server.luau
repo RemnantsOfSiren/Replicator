@@ -3,6 +3,12 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local RunService = game:GetService("RunService")
+
+if RunService:IsClient() then
+	return nil
+end
+
 local Repo = script.Parent.Parent :: Instance
 local Sift = require(Repo:WaitForChild("Sift")) :: any
 local Signal = require(Repo:WaitForChild("Signal")) :: any

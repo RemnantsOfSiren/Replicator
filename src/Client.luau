@@ -1,4 +1,10 @@
 --!strict
+local RunService = game:GetService("RunService")
+
+if RunService:IsServer() then
+	return nil
+end
+
 local Repo = script.Parent.Parent :: Instance
 local Sift = require(Repo:WaitForChild("Sift")) :: any
 local Dynamo = require(Repo:WaitForChild("Dynamo")) :: any

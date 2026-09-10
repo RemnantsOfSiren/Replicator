@@ -1,6 +1,5 @@
 --!strict
 local Types = require(script.Types)
-local Logger = require(script.Logger)
 
 --[=[
     @class Replica
