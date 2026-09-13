@@ -1,8 +1,10 @@
 --!strict
 local RunService = game:GetService("RunService")
 
+local Types = require(script.Parent.Types)
+
 if RunService:IsServer() then
-	return nil
+	return {} :: Types.ClientReplicator
 end
 
 local Repo = script.Parent.Parent :: Instance
@@ -10,7 +12,6 @@ local Sift = require(Repo:WaitForChild("Sift")) :: any
 local Dynamo = require(Repo:WaitForChild("Dynamo")) :: any
 
 local Net = require(script.Parent.Net.Client)
-local Types = require(script.Parent.Types)
 local Logger = require(script.Parent.Logger)
 local Serializer = require(script.Parent.Serializer)
 
@@ -312,4 +313,4 @@ return table.freeze({
 
 		return Disconnector
 	end,
-})
+}) :: Types.ClientReplicator

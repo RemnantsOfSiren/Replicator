@@ -1,7 +1,8 @@
 --!strict
 local HttpService = game:GetService("HttpService")
 
-local Sift = require(script.Parent.Parent.Sift) :: any
+local Repo = script.Parent.Parent :: Instance
+local Sift = require(Repo:WaitForChild("Sift")) :: any
 
 local Types = require(script.Parent.Types)
 local Logger = require(script.Parent.Logger)
@@ -94,32 +95,45 @@ CreateReplicatedTable = function(
 			end
 
 			local IsTable = type(Value) == "table"
-			self.__oldtable = self:Get()
 
 			if IsTable and Value.__type == "ReplicatedTable" then
 				return
 			end
-			
+
+			local TValue = rawget(Table, Key)
+
+			local Unchanged = if IsTable
+				then (type(TValue) == "table" and Dictionary.equalsDeep(Value, TValue))
+				else (TValue == Value)
+
 			local _Indicies = table.clone(Indicies or {})
 			_Indicies[#_Indicies + 1] = Key
 
-			if IsTable then
+			if IsTable and (not Unchanged or rawget(self.__value, Key) == nil) then
 				rawset(self.__value, Key, CreateReplicatedTable(Value, _Indicies, OnChange))
 			end
-			
+
+			if Unchanged then
+				return
+			end
+
 			if Sift.Array.is(Table) and Value == nil then
 				Logger("Warn", "Use :Remove() to remove an element from an array.")
 				return
-			else
-				local TValue = rawget(Table, Key)
-				
-				if (IsTable and type(TValue) == "table" and Dictionary.equalsDeep(Value, TValue)) or (not IsTable and TValue == Value) then
-					return
-				end
-				
-				rawset(Table, Key, Value)
-				OnChange(Serializer.ConvertToPacket(_Indicies), Value, "Set")
 			end
+
+			self.__oldtable = setmetatable({}, {
+				__index = function(_, Lookup)
+					if Lookup == Key then
+						return TValue
+					end
+
+					return Table[Lookup]
+				end,
+			})
+
+			rawset(Table, Key, Value)
+			OnChange(Serializer.ConvertToPacket(_Indicies), Value, "Set")
 
 			if rawget(self.__value, Key) and Value == nil then
 				rawset(self.__value, Key, nil)

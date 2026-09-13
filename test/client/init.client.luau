@@ -8,6 +8,7 @@ for i = 1, 20 do
             Replica:ObserveChange("TestArray", function(Value, OldValue)
                 print("NewValue:", Value, "OldValue:", OldValue)
             end)
+            
             Replica:ObserveChange("TestString", function(Key, Value)
                 print("New String:", Key, "Value:", Value)
             end)

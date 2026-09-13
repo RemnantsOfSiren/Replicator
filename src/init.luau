@@ -26,6 +26,6 @@ export type ValidPath = Types.ValidPath
 export type ToOptions = Types.ToOptions
 
 return {
-	Server = require(script.Server),
-	Client = require(script.Client)
+	Server = require(script.Server) :: ServerReplica?,
+	Client = require(script.Client) :: ClientReplicator?
 }

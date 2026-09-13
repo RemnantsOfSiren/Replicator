@@ -32,7 +32,6 @@ for _, Replica in ipairs(Replicas) do
     Replica.Data.TestArray:Insert({ 10 })
 
     task.delay(2, function()
-        --Replica:SetParent(Parent2)
         Replica.Data.TestArray:Remove(3)
     end)
 

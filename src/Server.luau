@@ -1,12 +1,13 @@
 --!strict
 --!optimize 2
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local RunService = game:GetService("RunService")
+local Types = require(script.Parent.Types)
 
 if RunService:IsClient() then
-	return nil
+	return {} :: Types.ServerReplicator
 end
 
 local Repo = script.Parent.Parent :: Instance
@@ -15,13 +16,12 @@ local Signal = require(Repo:WaitForChild("Signal")) :: any
 local Dynamo = require(Repo:WaitForChild("Dynamo")) :: any
 
 local Net = require(script.Parent.Net.Server)
-local Types = require(script.Parent.Types)
 local Logger = require(script.Parent.Logger)
 local Parser = require(script.Parent.Parser)
 
 local Dictionary = Sift.Dictionary
 
-local Replicas: { [string]: ServerReplica } = {}
+local Replicas: { [string]: Types.ServerReplica } = {}
 
 local Replica = require(script.Parent.Replica)
 local Serializer = require(script.Parent.Serializer)
@@ -370,10 +370,9 @@ end
 
 local CreateReplicatedTable = require(script.Parent.ReplicatedTable)
 
-export type ServerReplica = Replica.Replica & typeof(setmetatable({} :: Types.ServerReplica, ServerReplica))
 
-local function NewReplica(Config: Types.ServerConfig): ServerReplica
-	local Parent: ServerReplica? = Config.Parent :: ServerReplica?
+local function NewReplica(Config: Types.ServerConfig): Types.ServerReplica
+	local Parent: Types.ServerReplica? = Config.Parent :: Types.ServerReplica?
 
 	if Parent and Parent.To then
 		Config.To = Parent.To
@@ -381,7 +380,7 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 		Config.To = "All"
 	end
 
-	local self: ServerReplica = setmetatable(Replica.new(Config) :: any, ServerReplica) :: any
+	local self: Types.ServerReplica = setmetatable(Replica.new(Config) :: any, ServerReplica) :: any
 
 	self.__ReplicateToChanged = Signal.new()
 
@@ -425,7 +424,7 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 
 	if Config.Data then
 		self.Data = self:AddCleanupMethod(CreateReplicatedTable(Config.Data, nil, function(Packet, Value, Action)
-			self.__Change:Fire(Serializer.ConvertToPath(Packet), self.Data:Get(), self.Data.__oldtable)
+			self.__Change:Fire(Serializer.ConvertToPath(Packet), self.Data.__table, self.Data.__oldtable)
 
 			local Buffer = if Value ~= nil then Dynamo.Serialize1(Value) else nil
 
@@ -445,7 +444,7 @@ local function NewReplica(Config: Types.ServerConfig): ServerReplica
 		and Config.WriteLib:IsDescendantOf(ReplicatedStorage)
 	then
 		self.WriteLib = Config.WriteLib
-		self.__WriteLib = require(self.WriteLib) :: { [string]: (self: ServerReplica, ...any) -> unknown }
+		self.__WriteLib = require(self.WriteLib) :: { [string]: (self: Types.ServerReplica, ...any) -> unknown }
 	elseif Config.WriteLib then
 		Logger("Error", "WriteLib must be a ModuleScript and a descendant of ReplicatedStorage.")
 	end
@@ -519,4 +518,4 @@ end)
 ]=]
 return table.freeze({
 	NewReplica = NewReplica,
-})
+}) :: Types.ServerReplicator
