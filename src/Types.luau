@@ -36,7 +36,7 @@ export type Replica<T = any> = {
 	ListenToKeyRemoved: (self: Replica<T>, Path: ValidPath, Callback: (...any) -> ()) -> Connection,
 }
 
-export type ReplicatedTable<T = any> = typeof(setmetatable(
+export type ReplicatedTable<T = any> = T & typeof(setmetatable(
 	{} :: {
 		[any]: any,
 		__type: "ReplicatedTable",
@@ -53,7 +53,101 @@ export type ReplicatedTable<T = any> = typeof(setmetatable(
 	{} :: {
 		__iter: (self: ReplicatedTable<T>) -> () -> (any, any, (Value: any) -> ()),
 	}
-))
+	))
+
+type function ToReplicatedTable(input, packetKey)	
+	local function indexer(key, value)
+		return { index = key, readresult = value, writeresult = value }
+	end
+	
+	local function fn(params, returns)
+		return types.newfunction({ head = params }, { head = returns })
+	end
+
+	local nilType = types.singleton(nil)
+	local anyMap = types.newtable({}, indexer(types.any, types.any))
+
+	local function makeReplicated(T)
+		local meta = types.newtable({})
+		local body = types.newtable({}, indexer(types.any, types.any), meta)
+		local self = types.intersectionof(T, body)
+
+		local props = {
+			__type = types.singleton("ReplicatedTable"),
+			__value = types.intersectionof(anyMap, T),
+			__table = T,
+			__onChange = fn({
+				types.newtable({}, indexer(types.number, packetKey)),
+				types.any,
+				types.string,
+			}, {}),
+			__oldtable = anyMap,
+			__indicies = types.unionof(
+				types.newtable({}, indexer(types.number, types.unionof(types.string, types.number))),
+				nilType
+			),
+			Get = fn({ self }, { T }),
+			Insert = fn({ self, types.any, types.unionof(types.any, nilType) }, {}),
+			Remove = fn({ self, types.number }, {}),
+			Destroy = fn({ self }, {}),
+		}
+		for name, ty in props do
+			body:setproperty(types.singleton(name), ty)
+		end
+
+		meta:setproperty(
+			types.singleton("__iter"),
+			fn({ self }, { fn({}, { types.any, types.any, fn({ types.any }, {}) }) })
+		)
+
+		return self
+	end
+
+	local cache = {}
+
+	local function transform(ty)
+		if cache[ty] then
+			return cache[ty]
+		end
+
+		if ty:is("table") then
+			local props = {}
+			for key, prop in ty:properties() do
+				props[key] = {
+					read = if prop.read then transform(prop.read) else nil,
+					write = if prop.write then transform(prop.write) else nil,
+				}
+			end
+
+			local idx = ty:indexer()
+			local newIndexer = nil
+			if idx then
+				local read = transform(idx.readresult)
+				newIndexer = {
+					index = idx.index,
+					readresult = read,
+					writeresult = if idx.writeresult then transform(idx.writeresult) else read,
+				}
+			end
+			
+			local result = makeReplicated(types.newtable(props, newIndexer))
+			cache[ty] = result
+			return result
+		elseif ty:is("union") or ty:is("intersection") then
+			local parts = {}
+			for _, part in ty:components() do
+				table.insert(parts, transform(part))
+			end
+			return if ty:is("union")
+				then types.unionof(table.unpack(parts))
+				else types.intersectionof(table.unpack(parts))
+		end
+
+		return ty
+	end
+
+	return transform(input)
+end
 
 export type RemoteEvent = {
 	fire: (Player: Player, Packet: { [any]: any }) -> (),
@@ -62,7 +156,7 @@ export type RemoteEvent = {
 }
 
 export type ServerReplica<T = any> = Replica<T> & {
-	Data: ReplicatedTable<T>,
+	Data: ToReplicatedTable<T, {}>,
 	__Fire: (Event: RemoteEvent, Packet: { [any]: any }) -> (),
 	__Ready: boolean?,
 	__Parent: ServerReplica<T>?,
