@@ -1,6 +1,6 @@
 [package]
 name = "remnantsofsiren/replicator2"
-version = "2.2.3"
+version = "2.2.4"
 registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
 exclude = ["test", "Packages", "build", "test.project.json", "selene.toml", "README.md", ".gitignore", ".vscode", ".github", "NetDefinitions.blink", "oldsrc"]
